@@ -65,7 +65,7 @@ minute of a renewal; open connections keep running.
 | `image.pullPolicy` | `IfNotPresent` | |
 | `kubernetes.access` | `none` | `none`: own ServiceAccount, no token. `read`/`write`: `claude-reader`/`claude-writer` with a token |
 | `argocd.enabled` | `false` | Mounts the Argo CD token and sets `ARGOCD_SERVER`, `ARGOCD_OPTS=--grpc-web` |
-| `argocd.server` | `argo.infra.k8s.wlkr.ch` | |
+| `argocd.server` | `argo-grpc.infra.k8s.wlkr.ch` | |
 | `ssh.authorizedKeys` | `[]` | Public key lines |
 | `ssh.gateway` | `apps-gateway`/`kube-system`/`ssh` | `TLSRoute` parent: name, namespace, sectionName |
 | `ssh.domain` | `ssh.wlkr.ch` | |

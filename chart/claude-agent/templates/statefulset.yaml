@@ -88,6 +88,9 @@ spec:
               value: {{ printf "%s:443" .Values.argocd.server | quote }}
             - name: ARGOCD_OPTS
               value: --grpc-web
+            # The Gateway offers no ALPN; gRPC refuses TLS without it otherwise.
+            - name: GRPC_ENFORCE_ALPN_ENABLED
+              value: "false"
             - name: ARGOCD_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
