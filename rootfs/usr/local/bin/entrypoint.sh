@@ -89,8 +89,15 @@ if [ "${1:-}" = check ]; then
 fi
 
 # 3. Git over HTTPS with the PAT, and the repository, cloned once.
-if [ -n "${GH_TOKEN:-}" ]; then
-  gh auth setup-git --hostname github.com || log "gh auth setup-git failed"
+has_github() { /usr/local/bin/agent-token github >/dev/null; }
+if has_github; then
+  # What gh auth setup-git writes, but through the wrapper: /usr/bin/gh alone
+  # has no token. Rewritten on every start, which also fixes older configs.
+  for host in https://github.com https://gist.github.com; do
+    git config --global --unset-all "credential.$host.helper" || true
+    git config --global --add "credential.$host.helper" ""
+    git config --global --add "credential.$host.helper" "!/usr/local/bin/gh auth git-credential"
+  done
   if [ -z "$(git config --global user.email || true)" ]; then
     if user="$(gh api user --jq '[.login, (.id|tostring), (.name // .login)] | @tsv' 2>/dev/null)"; then
       IFS=$'\t' read -r login id name <<<"$user"
@@ -106,11 +113,11 @@ cloned=()
 for repo in $REPOS; do
   dir="$HOME/${repo##*/}"
   if [ ! -d "$dir/.git" ]; then
-    if [ -n "${GH_TOKEN:-}" ]; then
+    if has_github; then
       log "cloning $repo"
       gh repo clone "$repo" "$dir" || log "clone of $repo failed; continuing"
     else
-      log "repo $repo set but GH_TOKEN is empty; not cloning"
+      log "repo $repo set but there is no GitHub token; not cloning"
     fi
   fi
   [ -d "$dir/.git" ] && cloned+=("$dir")
@@ -122,8 +129,8 @@ SKILLS_REPO="${AGENT_SKILLS_REPO:-}"
 SKILLS_REF="${AGENT_SKILLS_REF:-main}"
 SKILLS_DIR="$HOME/.claude/skills"
 if [ -n "$SKILLS_REPO" ]; then
-  if [ -z "${GH_TOKEN:-}" ]; then
-    log "skills repo $SKILLS_REPO set but GH_TOKEN is empty; not cloning"
+  if ! has_github; then
+    log "skills repo $SKILLS_REPO set but there is no GitHub token; not cloning"
   elif [ -e "$SKILLS_DIR/.git" ]; then
     # Follow a changed skills.ref: switch only when the checkout is clean.
     if [ "$(git -C "$SKILLS_DIR" symbolic-ref -q --short HEAD || true)" != "$SKILLS_REF" ]; then

@@ -4,11 +4,11 @@
 set -uo pipefail
 
 echo "Agent environment (claude-${AGENT_SESSION:-agent}):"
-if [ -n "${GH_TOKEN:-}" ]; then
+if agent-token github >/dev/null; then
   if login="$(timeout 10 gh api user --jq .login 2>/dev/null)"; then
     echo "- GitHub: authenticated as $login"
   else
-    echo "- GitHub: GH_TOKEN is set but the API call failed"
+    echo "- GitHub: a token is mounted but the API call failed"
   fi
 else
   echo "- GitHub: no token; no pushes or PRs"
@@ -32,8 +32,8 @@ if [ -n "$skills" ]; then
     timeout 10 git -C "$sdir" pull --ff-only -q >/dev/null 2>&1 || true
     head="$(git -C "$sdir" rev-parse --short HEAD 2>/dev/null || echo unknown)"
     echo "- Skills: $skills at $head in ~/.claude/skills"
-  elif [ -z "${GH_TOKEN:-}" ]; then
-    echo "- Skills: $skills not available; no GH_TOKEN"
+  elif ! agent-token github >/dev/null; then
+    echo "- Skills: $skills not available; no GitHub token"
   else
     echo "- Skills: $skills not cloned into ~/.claude/skills (see the entrypoint log)"
   fi
@@ -44,7 +44,7 @@ if [ -r /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
 else
   echo "- Kubernetes: no service account token; no cluster access"
 fi
-if [ -n "${ARGOCD_AUTH_TOKEN:-}" ]; then
+if agent-token argocd >/dev/null; then
   echo "- Argo CD: argocd CLI configured for ${ARGOCD_SERVER:-?}"
 fi
 exit 0
