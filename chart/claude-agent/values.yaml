@@ -61,6 +61,11 @@ acp:
   # -- Allow npm registry egress for ACP clients; claude-code-acp itself is in the image.
   enabled: false
 
+appa:
+  # -- Protect the main session with OpenAPPA: install its Claude Code plugin
+  # on start and run Claude under clappa. Opens GitHub egress for the install.
+  enabled: false
+
 # -- User-scope MCP servers, merged into ~/.claude.json on start; a server
 # removed here is removed there.
 mcpServers: {}

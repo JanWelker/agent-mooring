@@ -80,6 +80,8 @@ spec:
               value: {{ .Values.skills.repo | quote }}
             - name: AGENT_SKILLS_REF
               value: {{ .Values.skills.ref | quote }}
+            - name: AGENT_APPA
+              value: {{ .Values.appa.enabled | quote }}
             {{- if .Values.argocd.enabled }}
             - name: ARGOCD_SERVER
               value: {{ printf "%s:443" .Values.argocd.server | quote }}

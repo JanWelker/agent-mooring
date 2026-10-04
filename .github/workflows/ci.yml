@@ -84,7 +84,7 @@ jobs:
           docker run --rm --entrypoint claude claude-agent:ci --version
           docker run --rm --entrypoint kubectl claude-agent:ci version --client
           docker run --rm --entrypoint argocd claude-agent:ci version --client
-          for t in helm argocd cilium hubble bao gh node socat claude-code-acp; do
+          for t in helm argocd cilium hubble bao appa gh node socat claude-code-acp; do
             docker run --rm --entrypoint bash claude-agent:ci -c "command -v $t"
           done
       - name: sshd -t with the generated config, read-only root

@@ -30,6 +30,8 @@ ARG CILIUM_CLI_VERSION=0.20.1
 ARG HUBBLE_VERSION=1.19.4
 # renovate: datasource=github-releases depName=openbao/openbao extractVersion=^v(?<version>.*)$
 ARG OPENBAO_VERSION=2.7.1
+# renovate: datasource=github-releases depName=archestra-ai/OpenAPPA extractVersion=^v(?<version>.*)$
+ARG APPA_VERSION=0.31.1
 
 # The release binary, checked against the manifest whose signature must come
 # from the pinned key: GnuPG's VALIDSIG line ends in the primary key's
@@ -50,6 +52,7 @@ RUN case "$(dpkg --print-architecture)" in amd64) p=linux-x64 ;; arm64) p=linux-
 
 # Each download is checked against the checksum file its project publishes.
 RUN ARCH="$(dpkg --print-architecture)" \
+ && case "$ARCH" in amd64) RUST_ARCH=x86_64 ;; arm64) RUST_ARCH=aarch64 ;; esac \
  && gh="https://github.com" \
  && k8s="https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \
  && curl -fsSLO "$k8s" \
@@ -69,12 +72,16 @@ RUN ARCH="$(dpkg --print-architecture)" \
  && curl -fsSLO "$gh/openbao/openbao/releases/download/v${OPENBAO_VERSION}/openbao_${OPENBAO_VERSION}_linux_${ARCH}.tar.gz" \
       -O "$gh/openbao/openbao/releases/download/v${OPENBAO_VERSION}/checksums.txt" \
  && grep -E "  openbao_${OPENBAO_VERSION}_linux_${ARCH}\.tar\.gz$" checksums.txt | sha256sum -c --quiet - \
+ && curl -fsSLO "$gh/archestra-ai/OpenAPPA/releases/download/v${APPA_VERSION}/appa-${RUST_ARCH}-unknown-linux-gnu.tar.gz" \
+      -O "$gh/archestra-ai/OpenAPPA/releases/download/v${APPA_VERSION}/SHA256SUMS" \
+ && grep -E "  appa-${RUST_ARCH}-unknown-linux-gnu\.tar\.gz$" SHA256SUMS | sha256sum -c --quiet - \
  && install -m 0755 kubectl /out/kubectl \
  && tar -xzO -f "helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" "linux-${ARCH}/helm" > /out/helm \
  && install -m 0755 "argocd-linux-${ARCH}" /argocd \
  && tar -xz -C /out -f "cilium-linux-${ARCH}.tar.gz" cilium \
  && tar -xz -C /out -f "hubble-linux-${ARCH}.tar.gz" hubble \
  && tar -xz -C /out -f "openbao_${OPENBAO_VERSION}_linux_${ARCH}.tar.gz" bao \
+ && tar -xz -C /out -f "appa-${RUST_ARCH}-unknown-linux-gnu.tar.gz" ./appa \
  && chmod 0755 /out/* \
  && rm -rf /dl/*
 

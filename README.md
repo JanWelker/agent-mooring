@@ -46,6 +46,7 @@ shared-writable without the sticky bit.
 | Shell | openssh-server, socat, tmux, git, gh, jq, ripgrep, rsync, python3, vim-tiny, less |
 | Node.js | `node`, `npm`, `npx` for MCP servers; `claude-agent-acp`, also as `claude-code-acp` |
 | Cluster | kubectl, helm, argocd, cilium, hubble, bao |
+| Guardrails | [`appa`](https://github.com/archestra-ai/OpenAPPA), the OpenAPPA CLI |
 
 The build verifies every download: Claude Code against its release manifest,
 whose GPG signature must come from Anthropic's
@@ -70,14 +71,23 @@ every start and is idempotent:
 4. Merges `/etc/claude-agent/mcp.json` into `~/.claude.json`, removing servers
    the chart set before and no longer lists (tracked in
    `~/.claude/agent-mcp-servers.json`).
-5. Writes the container environment to `/tmp/agent/env`, which login shells
+5. With `AGENT_APPA=true`: runs `appa plugin install claude-code` for the
+   image's `appa` version when that version is not deployed yet. It writes
+   OpenAPPA's hooks to `~/.claude/settings.json`, the `appa` MCP server, the
+   `appa-guide` skill (excluded from git in the skills checkout), the policy in
+   `~/.config/appa`, and the runtime and `clappa` under `~/.local`; an
+   existing policy is kept. Turned off again, `appa plugin remove claude-code`
+   drops the registration and keeps the policy.
+6. Writes the container environment to `/tmp/agent/env`, which login shells
    source, since sshd does not pass it on.
-6. Starts tmux session `main` with
+7. Starts tmux session `main` with
    `claude --remote-control claude-<session> --continue`, in the repository
    directory when there is exactly one repository, otherwise in `~`.
    [`agent-claude`](rootfs/usr/local/bin/agent-claude) restarts Claude
    whenever it exits, backing off up to 5 minutes when it keeps failing.
-7. Execs `sshd -D` on `127.0.0.1:2223` with a config generated in `/tmp/agent`.
+   With `AGENT_APPA=true` it runs `clappa` instead, which turns the hooks on;
+   if `clappa` is missing it does not start Claude unprotected.
+8. Execs `sshd -D` on `127.0.0.1:2223` with a config generated in `/tmp/agent`.
 
 An SSH login without a command attaches `main`; a login with a command runs it,
 so `scp`, `rsync`, `sftp` and ACP work.
@@ -110,6 +120,7 @@ minute of a renewal; open connections keep running.
 | `tls.existingSecret` | `""` | A `kubernetes.io/tls` Secret in the namespace to serve instead of a per-session certificate, for example one `*.<ssh.domain>` wildcard for all sessions; no `Certificate` is created, and the session name stays out of certificate transparency logs |
 | `tls.issuerRef` | `letsencrypt-prod`, `ClusterIssuer` | Issuer of the `claude-<session>-tls` certificate the sidecar serves when `tls.existingSecret` is empty |
 | `acp.enabled` | `false` | Opens npm registry egress for ACP clients |
+| `appa.enabled` | `false` | Protects the main session with [OpenAPPA](https://openappa.com): installs its Claude Code plugin on start and runs Claude under `clappa`. Only that session is gated; ACP and `claude` started by hand are not. Run `/appa-guide` in it once to tune the policy |
 | `mcpServers` | `{}` | User-scope MCP servers, `.mcp.json` format, merged into `~/.claude.json` on start. A server removed here is removed there; servers added by hand are kept |
 | `extraEgressFQDNs` | `[]` | `[{matchName: host, port: 443}]` or `[{matchPattern: "*.host"}]` |
 | `settings` | `{}` | Merged over the default `managed-settings.json` |
@@ -158,7 +169,7 @@ and lets out:
 | --- | --- |
 | DNS to kube-dns | always |
 | Claude Code's hosts from the [network requirements](https://code.claude.com/docs/en/network-config#network-access-requirements) | always |
-| `github.com`, `api.github.com`, `*.githubusercontent.com`, `ghcr.io` | `repos`, `repo` or `skills.repo` set |
+| `github.com`, `api.github.com`, `*.githubusercontent.com`, `ghcr.io` | `repos`, `repo` or `skills.repo` set, or `appa.enabled` |
 | `registry.npmjs.org` | `acp.enabled` or `mcpServers` set |
 | `kube-apiserver` entity | `kubernetes.access` not `none` |
 | `argocd.server` | `argocd.enabled` |
