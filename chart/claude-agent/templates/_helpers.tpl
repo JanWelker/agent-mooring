@@ -14,6 +14,11 @@ claude-{{ required "session is required" .Values.session }}
 {{- if or (include "claude-agent.repos" .) .Values.skills.repo -}}true{{- end -}}
 {{- end -}}
 
+{{/* repository:tag, with @digest when image.digest is set. */}}
+{{- define "claude-agent.image" -}}
+{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}{{ if .Values.image.digest }}@{{ .Values.image.digest }}{{ end }}
+{{- end -}}
+
 {{- define "claude-agent.selectorLabels" -}}
 app.kubernetes.io/name: claude-agent
 app.kubernetes.io/instance: {{ include "claude-agent.fullname" . }}

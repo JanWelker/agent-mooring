@@ -23,6 +23,9 @@ image:
   repository: ghcr.io/janwelker/claude-agent
   # -- Defaults to the chart's appVersion, the Claude Code version.
   tag: ""
+  # -- Image manifest digest (sha256:...), appended to the tag. The release
+  # workflow sets it in the packaged chart, so a re-pushed tag is re-pulled.
+  digest: ""
   pullPolicy: IfNotPresent
 
 kubernetes:

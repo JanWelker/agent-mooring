@@ -34,7 +34,7 @@ spec:
         # Native sidecar: TLS from the Gateway's passthrough listener ends
         # here and goes on to sshd on loopback.
         - name: tls
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "claude-agent.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           restartPolicy: Always
           command: ["/usr/bin/tini", "--", "/usr/local/bin/tls-proxy"]
@@ -67,7 +67,7 @@ spec:
               readOnly: true
       containers:
         - name: agent
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "claude-agent.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: AGENT_SESSION

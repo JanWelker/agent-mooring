@@ -26,3 +26,5 @@ claudeMd: |
   - No emojis in commit messages.
 persistence:
   existingClaim: claude-homelab-old
+image:
+  digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb

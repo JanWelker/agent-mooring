@@ -71,6 +71,7 @@ minute of a renewal; open connections keep running.
 | `skills.repo` | `""` | `owner/name` of the shared skills repository, cloned to `~/.claude/skills` and fast-forwarded on start and at each session start. Its root has the layout of `~/.claude/skills`. The PAT must cover it; set alone, it still gets the PAT and GitHub egress |
 | `skills.ref` | `main` | Branch cloned |
 | `repo` | `""` | Deprecated alias: appended to `repos`, duplicates dropped |
+| `image.digest` | `""` | `sha256:...` manifest digest appended to the tag. The release workflow sets it in the published chart, so a re-pushed tag is pulled again despite `IfNotPresent` |
 | `image.repository` | `ghcr.io/janwelker/claude-agent` | |
 | `image.tag` | `""` | Empty: the chart's `appVersion` |
 | `image.pullPolicy` | `IfNotPresent` | |

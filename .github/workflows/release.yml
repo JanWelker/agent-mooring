@@ -114,6 +114,8 @@ jobs:
 
       - name: Package and push the chart
         id: chart
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           base="$(yq '.version' chart/claude-agent/Chart.yaml)"
           minor="${base%.*}"
@@ -124,10 +126,13 @@ jobs:
             chart_version="$base"
           fi
           yq -i ".version = \"${chart_version}\" | .appVersion = \"${VERSION}\"" chart/claude-agent/Chart.yaml
+          # Pin the packaged chart to the image just pushed: a forced release
+          # re-pushes the same tag, which IfNotPresent nodes would never re-pull.
+          yq -i ".image.digest = \"${DIGEST}\"" chart/claude-agent/values.yaml
           helm package chart/claude-agent -d dist
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm push "dist/claude-agent-${chart_version}.tgz" "$CHART_REGISTRY"
-          git checkout -- chart/claude-agent/Chart.yaml
+          git checkout -- chart/claude-agent/Chart.yaml chart/claude-agent/values.yaml
           echo "version=${chart_version}" >> "$GITHUB_OUTPUT"
 
       - name: Tag and release
