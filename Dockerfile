@@ -79,13 +79,16 @@ COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
- && npm install -g --omit=dev --omit=optional "@agentclientprotocol/claude-agent-acp@${CLAUDE_AGENT_ACP_VERSION}" \
+ && npm install -g --omit=dev "@agentclientprotocol/claude-agent-acp@${CLAUDE_AGENT_ACP_VERSION}" \
+ && rm -rf /usr/local/lib/node_modules/@agentclientprotocol/claude-agent-acp/node_modules/@anthropic-ai/claude-agent-sdk-linux-* \
  && ln -s claude-agent-acp /usr/local/bin/claude-code-acp \
  && npm cache clean --force
 
 COPY --from=tools /out/ /usr/local/bin/
 COPY rootfs/ /
 
+# claude-agent-acp runs /usr/local/bin/claude (CLAUDE_CODE_EXECUTABLE below), so
+# the SDK's bundled copy of the binary is dropped above.
 # Interactive non-login shells (tmux panes) read bash.bashrc, not profile.d.
 RUN echo '. /etc/profile.d/agent-env.sh' >> /etc/bash.bashrc
 
