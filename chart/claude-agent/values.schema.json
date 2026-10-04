@@ -166,6 +166,9 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "policy": {
+          "type": "string"
         }
       }
     },

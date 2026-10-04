@@ -65,6 +65,10 @@ appa:
   # -- Protect the main session with OpenAPPA: install its Claude Code plugin
   # on start and run Claude under clappa. Opens GitHub egress for the install.
   enabled: false
+  # -- Root OpenAPPA policy (`appa.toml`), installed over `~/.config/appa/appa.toml`
+  # on start when it loads; an invalid one keeps the current policy. Empty
+  # leaves the policy on the PVC to `/appa-guide`.
+  policy: ""
 
 # -- User-scope MCP servers, merged into ~/.claude.json on start; a server
 # removed here is removed there.

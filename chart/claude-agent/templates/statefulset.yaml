@@ -174,6 +174,10 @@ spec:
                 path: authorized_keys
               - key: mcp.json
                 path: mcp.json
+              {{- if .Values.appa.policy }}
+              - key: appa.toml
+                path: appa.toml
+              {{- end }}
         {{- if include "claude-agent.tokens" . }}
         - name: tokens
           projected:

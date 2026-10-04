@@ -15,6 +15,7 @@ SSHD_PORT="${SSHD_PORT:-2223}"
 SSHD_LISTEN="${SSHD_LISTEN:-127.0.0.1}"
 AUTHORIZED_KEYS_SRC="${AGENT_AUTHORIZED_KEYS:-/etc/claude-agent/authorized_keys}"
 MCP_SRC="${AGENT_MCP_CONFIG:-/etc/claude-agent/mcp.json}"
+APPA_POLICY_SRC="${AGENT_APPA_POLICY:-/etc/claude-agent/appa.toml}"
 RUNTIME_DIR=/tmp/agent
 HOST_KEY_DIR="$HOME/.ssh/host"
 SSHD_CONFIG="$RUNTIME_DIR/sshd_config"
@@ -232,6 +233,24 @@ if [ "${AGENT_APPA:-false}" = true ]; then
       log "OpenAPPA $want installed"
     else
       log "OpenAPPA install failed; see $RUNTIME_DIR/appa-install.log"
+    fi
+  fi
+  # appa.policy from the chart replaces the root policy. It is checked in
+  # place, beside the batteries its include list names; one that does not
+  # load leaves the current policy serving.
+  policy="$HOME/.config/appa/appa.toml"
+  if [ -s "$APPA_POLICY_SRC" ] && [ -d "${policy%/*}" ] \
+    && ! cmp -s "$APPA_POLICY_SRC" "$policy"; then
+    candidate="${policy%/*}/.appa.toml.chart"
+    cp "$APPA_POLICY_SRC" "$candidate"
+    if "$APPA_DATA/bin/appa" describe --config "$candidate" 2>/dev/null \
+      | grep -q '^Config: .* (loadable)$'; then
+      [ -f "$policy" ] && cp -p "$policy" "$policy.bak"
+      mv "$candidate" "$policy"
+      log "OpenAPPA policy installed from appa.policy"
+    else
+      rm -f "$candidate"
+      log "appa.policy does not load; keeping the current OpenAPPA policy"
     fi
   fi
   # The skill lands in the skills checkout; keep it out of git status, which
