@@ -155,7 +155,7 @@ spec:
             claimName: {{ include "claude-agent.claimName" . }}
         - name: tls
           secret:
-            secretName: {{ $name }}-tls
+            secretName: {{ include "claude-agent.tlsSecretName" . }}
         - name: tmp
           emptyDir:
             sizeLimit: 4Gi

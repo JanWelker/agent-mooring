@@ -16,7 +16,7 @@ skills:
   # ~/.claude/skills. The session's PAT must cover it; setting it alone is
   # enough to get the PAT and GitHub egress.
   repo: ""
-  # -- Branch to clone.
+  # -- Branch to clone; a change is checked out on the next start.
   ref: main
 
 image:
@@ -46,8 +46,13 @@ ssh:
   domain: ssh.wlkr.ch
 
 tls:
-  # -- Issuer of the per-session certificate the TLS sidecar serves; the
-  # Gateway passes TLS through, so the pod terminates it.
+  # -- A kubernetes.io/tls Secret in the release namespace to serve instead of
+  # a per-session certificate, for example one *.<ssh.domain> wildcard shared
+  # by every session. Keeps session names out of certificate transparency logs.
+  existingSecret: ""
+  # -- Issuer of the per-session certificate the TLS sidecar serves when
+  # existingSecret is empty; the Gateway passes TLS through, so the pod
+  # terminates it.
   issuerRef:
     name: letsencrypt-prod
     kind: ClusterIssuer
@@ -56,7 +61,8 @@ acp:
   # -- Allow npm registry egress for ACP clients; claude-code-acp itself is in the image.
   enabled: false
 
-# -- User-scope MCP servers, merged into ~/.claude.json on start.
+# -- User-scope MCP servers, merged into ~/.claude.json on start; a server
+# removed here is removed there.
 mcpServers: {}
 
 # -- Extra egress: [{matchName: host, port: 443}] or [{matchPattern: "*.host", port: 443}].

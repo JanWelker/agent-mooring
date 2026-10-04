@@ -41,6 +41,11 @@ claude-writer
 {{- end -}}
 {{- end -}}
 
+{{/* The Secret the TLS sidecar serves: tls.existingSecret or the chart's Certificate. */}}
+{{- define "claude-agent.tlsSecretName" -}}
+{{- .Values.tls.existingSecret | default (printf "%s-tls" (include "claude-agent.fullname" .)) -}}
+{{- end -}}
+
 {{- define "claude-agent.claimName" -}}
 {{- .Values.persistence.existingClaim | default (include "claude-agent.fullname" .) -}}
 {{- end -}}
