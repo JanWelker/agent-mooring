@@ -2,6 +2,13 @@
 claude-{{ required "session is required" .Values.session }}
 {{- end -}}
 
+{{/* Effective repository list, space-separated: repos plus the deprecated repo, deduplicated. Empty string when none. */}}
+{{- define "claude-agent.repos" -}}
+{{- $l := .Values.repos | default list -}}
+{{- if .Values.repo -}}{{- $l = append $l .Values.repo -}}{{- end -}}
+{{- join " " (uniq $l) -}}
+{{- end -}}
+
 {{- define "claude-agent.selectorLabels" -}}
 app.kubernetes.io/name: claude-agent
 app.kubernetes.io/instance: {{ include "claude-agent.fullname" . }}

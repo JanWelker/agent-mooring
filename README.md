@@ -37,12 +37,15 @@ every start and is idempotent:
 1. Generates SSH host keys once under `~/.ssh/host`.
 2. Copies `authorized_keys` from `/etc/claude-agent/authorized_keys`.
 3. With `GH_TOKEN`: `gh auth setup-git`, the git identity from the token's
-   user, and a one-time clone of `AGENT_REPO` into `~/<name>`.
+   user, and a one-time clone of each of `AGENT_REPOS` (space-separated) into `~/<name>`;
+   existing clones are never pulled or reset, the agent owns them. A failed
+   clone is logged and skipped.
 4. Merges `/etc/claude-agent/mcp.json` into `~/.claude.json`.
 5. Writes the container environment to `/tmp/agent/env`, which login shells
    source, since sshd does not pass it on.
 6. Starts tmux session `main` with
-   `claude --remote-control claude-<session> --continue`.
+   `claude --remote-control claude-<session> --continue`, in the repository
+   directory when there is exactly one repository, otherwise in `~`.
 7. Execs `sshd -D` on `127.0.0.1:2223` with a config generated in `/tmp/agent`.
 
 An SSH login without a command attaches `main`; a login with a command runs it,
@@ -59,7 +62,8 @@ minute of a renewal; open connections keep running.
 | Value | Default | Meaning |
 | --- | --- | --- |
 | `session` | required | DNS label. Resources are `claude-<session>`; SSH host `<session>.<ssh.domain>` |
-| `repo` | `""` | `owner/name` to clone. Empty: no PAT, no clone, no GitHub egress |
+| `repos` | `[]` | `owner/name` list, each cloned once into `~/<name>`. One PAT covers all. Empty (and no `repo`): no PAT, no clone, no GitHub egress |
+| `repo` | `""` | Deprecated alias: appended to `repos`, duplicates dropped |
 | `image.repository` | `ghcr.io/janwelker/claude-agent` | |
 | `image.tag` | `""` | Empty: the chart's `appVersion` |
 | `image.pullPolicy` | `IfNotPresent` | |
@@ -88,7 +92,7 @@ value. Secrets come from the store, without the `kv/` prefix:
 
 | Secret | Key | When |
 | --- | --- | --- |
-| `claude-<session>-github` → `GH_TOKEN` | `claude-<session>/github`, property `token` | `repo` set |
+| `claude-<session>-github` → `GH_TOKEN` | `claude-<session>/github`, property `token`; one PAT for all repositories | `repos` or `repo` set |
 | `claude-<session>-argocd` → `ARGOCD_AUTH_TOKEN` | `claude-agents/argocd`, property `token` | `argocd.enabled` |
 
 ### Managed settings
@@ -97,7 +101,7 @@ The chart's [defaults](chart/claude-agent/templates/_helpers.tpl) turn on
 Remote Control for every session, drop commit and PR attribution, allow
 read-only `kubectl`, `gh pr checks` and `argocd app get`, deny
 `gh pr merge --admin`, pushes to `main` and force pushes, and run a
-SessionStart hook that tells Claude which GitHub user, Kubernetes access and
+SessionStart hook that tells Claude which GitHub user, cloned repositories, Kubernetes access and
 Argo CD server it has. `settings` merges over them; a list replaces the
 default list.
 
@@ -110,7 +114,7 @@ The `CiliumNetworkPolicy` lets port 2222 in from the `ingress`, `host` and
 | --- | --- |
 | DNS to kube-dns | always |
 | Claude Code's hosts from the [network requirements](https://code.claude.com/docs/en/network-config#network-access-requirements) | always |
-| `github.com`, `api.github.com`, `*.githubusercontent.com`, `ghcr.io` | `repo` set |
+| `github.com`, `api.github.com`, `*.githubusercontent.com`, `ghcr.io` | `repos` or `repo` set |
 | `registry.npmjs.org` | `acp.enabled` or `mcpServers` set |
 | `kube-apiserver` entity | `kubernetes.access` not `none` |
 | `argocd.server` | `argocd.enabled` |

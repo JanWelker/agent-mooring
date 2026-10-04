@@ -72,11 +72,11 @@ spec:
           env:
             - name: AGENT_SESSION
               value: {{ .Values.session | quote }}
-            - name: AGENT_REPO
-              value: {{ .Values.repo | quote }}
+            - name: AGENT_REPOS
+              value: {{ include "claude-agent.repos" . | quote }}
             - name: AGENT_KUBERNETES_ACCESS
               value: {{ .Values.kubernetes.access | quote }}
-            {{- if .Values.repo }}
+            {{- if include "claude-agent.repos" . }}
             - name: GH_TOKEN
               valueFrom:
                 secretKeyRef:

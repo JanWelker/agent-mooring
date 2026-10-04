@@ -2,8 +2,12 @@
 # host is <session>.<ssh.domain>, and Remote Control shows claude-<session>.
 session: ""
 
-# -- GitHub repository (owner/name) to clone into $HOME once. Empty: no clone,
-# no PAT, no GitHub egress.
+# -- GitHub repositories (owner/name), each cloned once into $HOME/<name>. One
+# PAT per session at kv/claude-<session>/github must cover all of them. Empty
+# (with repo): no clone, no PAT, no GitHub egress.
+repos: []
+
+# -- Deprecated alias: appended to repos when set.
 repo: ""
 
 image:

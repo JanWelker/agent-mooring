@@ -48,7 +48,7 @@ spec:
         - matchName: http-intake.logs.us5.datadoghq.com
         - matchName: browser-intake-us5-datadoghq.com
       {{- include "claude-agent.https" . | nindent 6 }}
-    {{- if .Values.repo }}
+    {{- if include "claude-agent.repos" . }}
     - toFQDNs:
         - matchName: github.com
         - matchName: api.github.com

@@ -1,0 +1,6 @@
+session: multi
+repos:
+  - JanWelker/homelab
+  - JanWelker/homelab-apps
+  - JanWelker/claude-agent
+repo: JanWelker/homelab

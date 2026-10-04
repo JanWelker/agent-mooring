@@ -6,12 +6,24 @@ set -uo pipefail
 echo "Agent environment (claude-${AGENT_SESSION:-agent}):"
 if [ -n "${GH_TOKEN:-}" ]; then
   if login="$(timeout 10 gh api user --jq .login 2>/dev/null)"; then
-    echo "- GitHub: authenticated as $login${AGENT_REPO:+, repository $AGENT_REPO}"
+    echo "- GitHub: authenticated as $login"
   else
     echo "- GitHub: GH_TOKEN is set but the API call failed"
   fi
 else
   echo "- GitHub: no token; no pushes or PRs"
+fi
+repos="${AGENT_REPOS:-${AGENT_REPO:-}}"
+if [ -n "$repos" ]; then
+  echo "- Repositories you own (cloned into \$HOME; the entrypoint never pulls or resets them):"
+  for repo in $repos; do
+    dir="$HOME/${repo##*/}"
+    if [ -d "$dir/.git" ]; then
+      echo "  - $repo at $dir"
+    else
+      echo "  - $repo: not cloned"
+    fi
+  done
 fi
 if [ -r /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
   sa="$(timeout 10 kubectl auth whoami -o jsonpath='{.status.userInfo.username}' 2>/dev/null || echo unknown)"

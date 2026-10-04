@@ -8,7 +8,8 @@ set -euo pipefail
 
 : "${HOME:=/home/agent}"
 SESSION="${AGENT_SESSION:-agent}"
-REPO="${AGENT_REPO:-}"
+# AGENT_REPO is the pre-0.2.0 single-repository variable.
+REPOS="${AGENT_REPOS:-${AGENT_REPO:-}}"
 # Loopback only: the TLS sidecar on :2222 is the way in.
 SSHD_PORT="${SSHD_PORT:-2223}"
 SSHD_LISTEN="${SSHD_LISTEN:-127.0.0.1}"
@@ -95,18 +96,21 @@ if [ -n "${GH_TOKEN:-}" ]; then
   fi
 fi
 WORKDIR="$HOME"
-if [ -n "$REPO" ]; then
-  dir="$HOME/${REPO##*/}"
+cloned=()
+for repo in $REPOS; do
+  dir="$HOME/${repo##*/}"
   if [ ! -d "$dir/.git" ]; then
     if [ -n "${GH_TOKEN:-}" ]; then
-      log "cloning $REPO"
-      gh repo clone "$REPO" "$dir" || log "clone of $REPO failed; continuing in \$HOME"
+      log "cloning $repo"
+      gh repo clone "$repo" "$dir" || log "clone of $repo failed; continuing"
     else
-      log "repo $REPO set but GH_TOKEN is empty; not cloning"
+      log "repo $repo set but GH_TOKEN is empty; not cloning"
     fi
   fi
-  [ -d "$dir/.git" ] && WORKDIR="$dir"
-fi
+  [ -d "$dir/.git" ] && cloned+=("$dir")
+done
+# One repository: start in it. Several: start in $HOME.
+[ "${#cloned[@]}" -eq 1 ] && [ "$(wc -w <<<"$REPOS")" -eq 1 ] && WORKDIR="${cloned[0]}"
 echo "$WORKDIR" > "$RUNTIME_DIR/workdir"
 
 # User-scope MCP servers from the chart, merged into ~/.claude.json while
