@@ -10,6 +10,15 @@ repos: []
 # -- Deprecated alias: appended to repos when set.
 repo: ""
 
+skills:
+  # -- Shared skills repository (owner/name), cloned to ~/.claude/skills and
+  # fast-forwarded on every start and session. Its root has the layout of
+  # ~/.claude/skills. The session's PAT must cover it; setting it alone is
+  # enough to get the PAT and GitHub egress.
+  repo: ""
+  # -- Branch to clone.
+  ref: main
+
 image:
   repository: ghcr.io/janwelker/claude-agent
   # -- Defaults to the chart's appVersion, the Claude Code version.

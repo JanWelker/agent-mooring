@@ -25,6 +25,19 @@ if [ -n "$repos" ]; then
     fi
   done
 fi
+skills="${AGENT_SKILLS_REPO:-}"
+if [ -n "$skills" ]; then
+  sdir="$HOME/.claude/skills"
+  if [ -e "$sdir/.git" ]; then
+    timeout 10 git -C "$sdir" pull --ff-only -q >/dev/null 2>&1 || true
+    head="$(git -C "$sdir" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    echo "- Skills: $skills at $head in ~/.claude/skills"
+  elif [ -z "${GH_TOKEN:-}" ]; then
+    echo "- Skills: $skills not available; no GH_TOKEN"
+  else
+    echo "- Skills: $skills not cloned into ~/.claude/skills (see the entrypoint log)"
+  fi
+fi
 if [ -r /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
   sa="$(timeout 10 kubectl auth whoami -o jsonpath='{.status.userInfo.username}' 2>/dev/null || echo unknown)"
   echo "- Kubernetes: in-cluster as $sa (access: ${AGENT_KUBERNETES_ACCESS:-unknown}); check with kubectl auth can-i"

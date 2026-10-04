@@ -18,7 +18,12 @@ Claude agent {{ include "claude-agent.fullname" . }} (Claude Code {{ .Values.ima
 
 ACP from Zed: agent command `ssh {{ $host }} claude-code-acp`.
 {{- $repos := include "claude-agent.repos" . }}
-{{- if $repos }}
+{{- $skills := .Values.skills.repo }}
+{{- if or $repos $skills }}
 
-The PAT for {{ $repos }} (one token covering all of them) is read from OpenBao kv/{{ include "claude-agent.fullname" . }}/github (property token).
+The PAT for {{ join ", " (compact (list $repos $skills)) }} (one token covering all of them) is read from OpenBao kv/{{ include "claude-agent.fullname" . }}/github (property token).
+{{- end }}
+{{- if $skills }}
+
+Skills: {{ $skills }} ({{ .Values.skills.ref }}) is cloned to ~/.claude/skills and fast-forwarded on every start and session. An existing non-git ~/.claude/skills is moved to ~/.claude/skills.local-<timestamp>.
 {{- end }}

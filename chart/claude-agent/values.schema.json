@@ -17,6 +17,22 @@
       "description": "Deprecated: use repos.",
       "pattern": "^$|^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
     },
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repo": {
+          "type": "string",
+          "description": "owner/name of the shared skills repository, or empty.",
+          "pattern": "^$|^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._/-]+$"
+        }
+      }
+    },
     "repos": {
       "type": "array",
       "items": {

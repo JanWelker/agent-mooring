@@ -9,6 +9,11 @@ claude-{{ required "session is required" .Values.session }}
 {{- join " " (uniq $l) -}}
 {{- end -}}
 
+{{/* "true" when the session needs the GitHub token and egress: any repository or the skills repository. Empty otherwise. */}}
+{{- define "claude-agent.github" -}}
+{{- if or (include "claude-agent.repos" .) .Values.skills.repo -}}true{{- end -}}
+{{- end -}}
+
 {{- define "claude-agent.selectorLabels" -}}
 app.kubernetes.io/name: claude-agent
 app.kubernetes.io/instance: {{ include "claude-agent.fullname" . }}

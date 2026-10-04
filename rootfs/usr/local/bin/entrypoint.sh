@@ -109,6 +109,43 @@ for repo in $REPOS; do
   fi
   [ -d "$dir/.git" ] && cloned+=("$dir")
 done
+# 3b. The shared skills repository at ~/.claude/skills. Unlike the work repos
+# it is kept current: fast-forward only, and never fatal. Every network step
+# has a timeout so a hung GitHub cannot keep sshd from starting.
+SKILLS_REPO="${AGENT_SKILLS_REPO:-}"
+SKILLS_REF="${AGENT_SKILLS_REF:-main}"
+SKILLS_DIR="$HOME/.claude/skills"
+if [ -n "$SKILLS_REPO" ]; then
+  if [ -z "${GH_TOKEN:-}" ]; then
+    log "skills repo $SKILLS_REPO set but GH_TOKEN is empty; not cloning"
+  elif [ -e "$SKILLS_DIR/.git" ]; then
+    if timeout 60 git -C "$SKILLS_DIR" pull --ff-only -q; then
+      log "skills $SKILLS_REPO pulled (fast-forward only)"
+    else
+      log "skills pull of $SKILLS_REPO did not fast-forward; leaving the checkout as is"
+    fi
+  else
+    mkdir -p "$HOME/.claude"
+    tmp="$HOME/.claude/skills.clone-$$"
+    rm -rf "$tmp"
+    log "cloning skills $SKILLS_REPO ($SKILLS_REF)"
+    # Clone aside first: a failed or timed-out clone must not displace what is there.
+    if timeout 120 gh repo clone "$SKILLS_REPO" "$tmp" -- --branch "$SKILLS_REF"; then
+      if [ -e "$SKILLS_DIR" ] || [ -L "$SKILLS_DIR" ]; then
+        aside="$SKILLS_DIR.local-$(date +%Y%m%d-%H%M%S)"
+        log "moving existing $SKILLS_DIR to $aside"
+        mv "$SKILLS_DIR" "$aside" || log "could not move $SKILLS_DIR aside"
+      fi
+      if [ ! -e "$SKILLS_DIR" ]; then
+        mv "$tmp" "$SKILLS_DIR" || log "could not move the skills clone into place"
+      fi
+    else
+      log "clone of skills $SKILLS_REPO failed; continuing"
+    fi
+    rm -rf "$tmp"
+  fi
+fi
+
 # One repository: start in it. Several: start in $HOME.
 [ "${#cloned[@]}" -eq 1 ] && [ "$(wc -w <<<"$REPOS")" -eq 1 ] && WORKDIR="${cloned[0]}"
 echo "$WORKDIR" > "$RUNTIME_DIR/workdir"

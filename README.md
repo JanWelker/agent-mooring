@@ -40,6 +40,11 @@ every start and is idempotent:
    user, and a one-time clone of each of `AGENT_REPOS` (space-separated) into `~/<name>`;
    existing clones are never pulled or reset, the agent owns them. A failed
    clone is logged and skipped.
+   With `AGENT_SKILLS_REPO` too: clones it to `~/.claude/skills` (a non-git
+   directory there is moved to `~/.claude/skills.local-<timestamp>`, never
+   deleted), or fast-forwards an existing checkout; a pull that cannot
+   fast-forward is logged and left alone. Network steps run under `timeout`,
+   so sshd always starts.
 4. Merges `/etc/claude-agent/mcp.json` into `~/.claude.json`.
 5. Writes the container environment to `/tmp/agent/env`, which login shells
    source, since sshd does not pass it on.
@@ -62,7 +67,9 @@ minute of a renewal; open connections keep running.
 | Value | Default | Meaning |
 | --- | --- | --- |
 | `session` | required | DNS label. Resources are `claude-<session>`; SSH host `<session>.<ssh.domain>` |
-| `repos` | `[]` | `owner/name` list, each cloned once into `~/<name>`. One PAT covers all. Empty (and no `repo`): no PAT, no clone, no GitHub egress |
+| `repos` | `[]` | `owner/name` list, each cloned once into `~/<name>`. One PAT covers all. Empty (and no `repo` or `skills.repo`): no PAT, no clone, no GitHub egress |
+| `skills.repo` | `""` | `owner/name` of the shared skills repository, cloned to `~/.claude/skills` and fast-forwarded on start and at each session start. Its root has the layout of `~/.claude/skills`. The PAT must cover it; set alone, it still gets the PAT and GitHub egress |
+| `skills.ref` | `main` | Branch cloned |
 | `repo` | `""` | Deprecated alias: appended to `repos`, duplicates dropped |
 | `image.repository` | `ghcr.io/janwelker/claude-agent` | |
 | `image.tag` | `""` | Empty: the chart's `appVersion` |
@@ -92,7 +99,7 @@ value. Secrets come from the store, without the `kv/` prefix:
 
 | Secret | Key | When |
 | --- | --- | --- |
-| `claude-<session>-github` → `GH_TOKEN` | `claude-<session>/github`, property `token`; one PAT for all repositories | `repos` or `repo` set |
+| `claude-<session>-github` → `GH_TOKEN` | `claude-<session>/github`, property `token`; one PAT for all repositories | `repos`, `repo` or `skills.repo` set |
 | `claude-<session>-argocd` → `ARGOCD_AUTH_TOKEN` | `claude-agents/argocd`, property `token` | `argocd.enabled` |
 
 ### Managed settings
@@ -114,7 +121,7 @@ The `CiliumNetworkPolicy` lets port 2222 in from the `ingress`, `host` and
 | --- | --- |
 | DNS to kube-dns | always |
 | Claude Code's hosts from the [network requirements](https://code.claude.com/docs/en/network-config#network-access-requirements) | always |
-| `github.com`, `api.github.com`, `*.githubusercontent.com`, `ghcr.io` | `repos` or `repo` set |
+| `github.com`, `api.github.com`, `*.githubusercontent.com`, `ghcr.io` | `repos`, `repo` or `skills.repo` set |
 | `registry.npmjs.org` | `acp.enabled` or `mcpServers` set |
 | `kube-apiserver` entity | `kubernetes.access` not `none` |
 | `argocd.server` | `argocd.enabled` |

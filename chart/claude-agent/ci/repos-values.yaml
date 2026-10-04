@@ -4,3 +4,6 @@ repos:
   - JanWelker/homelab-apps
   - JanWelker/claude-agent
 repo: JanWelker/homelab
+skills:
+  repo: JanWelker/claude-skills
+  ref: main
