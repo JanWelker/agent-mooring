@@ -160,6 +160,15 @@
         }
       }
     },
+    "appa": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
     "mcpServers": {
       "type": "object",
       "additionalProperties": {

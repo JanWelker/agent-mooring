@@ -6,6 +6,8 @@ argocd:
   enabled: true
 acp:
   enabled: true
+appa:
+  enabled: true
 ssh:
   authorizedKeys:
     - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleExampleExampleExampleExampleExample user@laptop

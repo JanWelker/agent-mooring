@@ -198,6 +198,41 @@ if [ -r "$MCP_SRC" ]; then
   fi
 fi
 
+# 3c. OpenAPPA (https://openappa.com). `appa plugin install claude-code`
+# writes its hooks to ~/.claude/settings.json, the `appa` MCP server, the
+# appa-guide skill, the policy in ~/.config/appa, and the runtime and the
+# `clappa` launcher under ~/.local. The hooks act only in sessions clappa
+# starts, and agent-claude starts the main session with clappa. The install
+# fetches the release of the image's appa from GitHub, so it runs only when
+# that version is not deployed yet; it keeps an existing policy.
+APPA_DATA="$HOME/.local/share/appa"
+CLAPPA="$HOME/.local/bin/clappa"
+if [ "${AGENT_APPA:-false}" = true ]; then
+  want="$(appa --version | awk '{print $2}')"
+  have="$("$APPA_DATA/bin/appa" --version 2>/dev/null | awk '{print $2}' || true)"
+  if [ "$want" != "$have" ] || [ ! -x "$CLAPPA" ]; then
+    log "installing OpenAPPA $want for Claude Code"
+    if timeout 300 appa plugin install claude-code --revision "v$want" --no-agent-yell --json \
+      > "$RUNTIME_DIR/appa-install.json" 2> "$RUNTIME_DIR/appa-install.log"; then
+      log "OpenAPPA $want installed"
+    else
+      log "OpenAPPA install failed; see $RUNTIME_DIR/appa-install.log"
+    fi
+  fi
+  # The skill lands in the skills checkout; keep it out of git status, which
+  # gates switching skills.ref.
+  exclude="$SKILLS_DIR/.git/info/exclude"
+  if [ -d "$SKILLS_DIR/.git" ] && ! grep -qxF /appa-guide/ "$exclude" 2>/dev/null; then
+    mkdir -p "${exclude%/*}" && echo /appa-guide/ >> "$exclude"
+  fi
+elif [ -x "$CLAPPA" ]; then
+  # Turned off: drop the hooks, MCP server, skill and clappa; the policy and
+  # data stay for a later install.
+  log "removing OpenAPPA's Claude Code registration"
+  timeout 60 "$APPA_DATA/bin/appa" plugin remove claude-code --json > /dev/null \
+    || log "could not remove OpenAPPA's Claude Code registration"
+fi
+
 # 4. The long-running Claude session.
 /usr/local/bin/agent-session
 

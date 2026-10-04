@@ -9,11 +9,20 @@ delay=5
 
 trap 'echo; exec bash -l' INT
 
+# With OpenAPPA on, the session runs under clappa, which turns its hooks on.
+# Without clappa it does not start unprotected.
+claude=claude
+[ "${AGENT_APPA:-false}" = true ] && claude="$HOME/.local/bin/clappa"
+
 while [ ! -e "$hold" ]; do
   start=$SECONDS
+  if [ "$claude" != claude ] && [ ! -x "$claude" ]; then
+    echo "OpenAPPA is on but $claude is missing; see /tmp/agent/appa-install.log."
+    echo "Run: appa plugin install claude-code --revision v$(appa --version | awk '{print $2}')"
   # --continue fails on the first start, when there is no conversation yet.
-  claude --remote-control "$name" --name "$name" --continue ||
-    claude --remote-control "$name" --name "$name"
+  elif ! "$claude" --remote-control "$name" --name "$name" --continue; then
+    "$claude" --remote-control "$name" --name "$name"
+  fi
   # A Claude that keeps dying right away backs off to 5 minutes.
   if [ $((SECONDS - start)) -lt 60 ]; then
     delay=$((delay * 2 > 300 ? 300 : delay * 2))
