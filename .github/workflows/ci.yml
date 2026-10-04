@@ -1,0 +1,115 @@
+---
+name: CI
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # renovate: datasource=github-releases depName=helm/helm
+  HELM_VERSION: v4.3.0
+  # renovate: datasource=github-releases depName=yannh/kubeconform
+  KUBECONFORM_VERSION: v0.8.0
+
+jobs:
+  hadolint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Dockerfile
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Install kubeconform
+        run: |
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin kubeconform
+      - name: helm lint
+        run: |
+          for f in chart/claude-agent/ci/*-values.yaml; do
+            helm lint --strict chart/claude-agent -f "$f"
+          done
+      - name: helm template | kubeconform
+        run: |
+          for f in chart/claude-agent/ci/*-values.yaml; do
+            echo "::group::$f"
+            helm template claude chart/claude-agent -n claude-agents -f "$f" \
+              | kubeconform -strict -summary \
+                  -schema-location default \
+                  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+      - name: Schema rejects bad values
+        run: |
+          if helm template claude chart/claude-agent --set session=Bad_Name >/dev/null 2>&1; then
+            echo "an invalid session name rendered" >&2
+            exit 1
+          fi
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: claude-agent:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Tools run
+        run: |
+          docker run --rm --entrypoint claude claude-agent:ci --version
+          docker run --rm --entrypoint kubectl claude-agent:ci version --client
+          for t in helm argocd cilium hubble bao gh node claude-code-acp; do
+            docker run --rm --entrypoint bash claude-agent:ci -c "command -v $t"
+          done
+      - name: sshd -t with the generated config, read-only root
+        run: |
+          docker run --rm --read-only --user 1000:1000 \
+            --tmpfs /tmp --tmpfs /home/agent:uid=1000,gid=1000 \
+            claude-agent:ci check
+      - name: Managed settings from the chart are valid
+        run: |
+          mkdir -p managed
+          helm template claude chart/claude-agent -f chart/claude-agent/ci/full-values.yaml \
+            -s templates/configmap.yaml | yq '.data["managed-settings.json"]' > managed/managed-settings.json
+          out="$(docker run --rm --tmpfs /home/agent:uid=1000,gid=1000 \
+            -v "$PWD/managed:/etc/claude-code:ro" --entrypoint claude claude-agent:ci doctor 2>&1 || true)"
+          echo "$out"
+          if grep -q "Invalid settings" <<<"$out"; then exit 1; fi
+      - name: Start, ssh in, find the tmux session
+        run: |
+          mkdir -p keys && ssh-keygen -q -t ed25519 -N '' -f keys/id
+          cp keys/id.pub keys/authorized_keys && chmod 0644 keys/authorized_keys
+          docker run -d --name agent --read-only --user 1000:1000 \
+            --tmpfs /tmp --tmpfs /home/agent:uid=1000,gid=1000 \
+            -v "$PWD/keys:/etc/claude-agent:ro" -e AGENT_SESSION=ci \
+            -p 2222:2222 claude-agent:ci
+          for _ in $(seq 30); do nc -z localhost 2222 && break; sleep 1; done
+          ssh -i keys/id -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -p 2222 agent@localhost 'id -u; tmux has-session -t main && echo tmux-ok; claude --version' | tee out.txt
+          grep -qx 1000 out.txt && grep -qx tmux-ok out.txt
+      - name: Container logs
+        if: always()
+        run: docker logs agent || true

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "claude-agent.fullname" . }}
+  labels:
+    {{- include "claude-agent.labels" . | nindent 4 }}
+data:
+  managed-settings.json: |
+    {{- include "claude-agent.managedSettings" . | nindent 4 }}
+  CLAUDE.md: |
+    {{- .Values.claudeMd | nindent 4 }}
+  mcp.json: |
+    {{- dict "mcpServers" .Values.mcpServers | toPrettyJson | nindent 4 }}
+  authorized_keys: |
+    {{- range .Values.ssh.authorizedKeys }}
+    {{ . | trim }}
+    {{- end }}

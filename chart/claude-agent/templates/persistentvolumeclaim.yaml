@@ -1,0 +1,21 @@
+{{- if not .Values.persistence.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "claude-agent.fullname" . }}
+  labels:
+    {{- include "claude-agent.labels" . | nindent 4 }}
+  annotations:
+    # The home directory holds the conversation, the clone and the host keys.
+    argocd.argoproj.io/sync-options: Prune=false
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

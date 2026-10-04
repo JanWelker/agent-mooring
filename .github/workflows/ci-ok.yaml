@@ -1,0 +1,18 @@
+---
+# The check the ruleset on main requires. It waits for every other check on
+# the head commit; the logic lives in JanWelker/renovate-config.
+name: CI OK
+
+"on":
+  pull_request:
+
+permissions:
+  checks: read
+
+concurrency:
+  group: ci-ok-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci-ok:
+    uses: JanWelker/renovate-config/.github/workflows/wait-for-checks.yaml@3f421abe635f729739883a6912cc2e8b819944fd # v1.1.0

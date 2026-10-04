@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>JanWelker/renovate-config"
+  ],
+  "customManagers": [
+    {
+      "description": "Tool and package versions pinned by ARG in the Dockerfile and by env in the workflows, each under a `# renovate:` comment.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/",
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+extractVersion=(?<extractVersion>\\S+))?\\s*\\n\\s*(?:ARG\\s+)?[A-Z0-9_]+(?:=|:\\s*)[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+      ]
+    }
+  ]
+}

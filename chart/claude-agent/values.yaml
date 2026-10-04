@@ -1,0 +1,70 @@
+# -- Session name, a DNS label. Resources are named claude-<session>, the SSH
+# host is <session>.<ssh.domain>, and Remote Control shows claude-<session>.
+session: ""
+
+# -- GitHub repository (owner/name) to clone into $HOME once. Empty: no clone,
+# no PAT, no GitHub egress.
+repo: ""
+
+image:
+  repository: ghcr.io/janwelker/claude-agent
+  # -- Defaults to the chart's appVersion, the Claude Code version.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+kubernetes:
+  # -- none: own ServiceAccount, no token. read: claude-reader. write: claude-writer.
+  access: none
+
+argocd:
+  enabled: false
+  server: argo.infra.k8s.wlkr.ch
+
+ssh:
+  # -- Public key lines for ~/.ssh/authorized_keys.
+  authorizedKeys: []
+  gateway:
+    name: apps-gateway
+    namespace: kube-system
+    sectionName: ssh
+  domain: ssh.wlkr.ch
+
+acp:
+  # -- Allow npm registry egress for ACP clients; claude-code-acp itself is in the image.
+  enabled: false
+
+# -- User-scope MCP servers, merged into ~/.claude.json on start.
+mcpServers: {}
+
+# -- Extra egress: [{matchName: host, port: 443}] or [{matchPattern: "*.host", port: 443}].
+extraEgressFQDNs: []
+
+# -- Merged over the chart's default managed-settings.json.
+settings: {}
+
+# -- Managed CLAUDE.md (/etc/claude-code/CLAUDE.md) for every session in the pod.
+claudeMd: ""
+
+persistence:
+  # -- Use this PVC instead of creating claude-<session>.
+  existingClaim: ""
+  size: 20Gi
+  storageClass: rook-ceph-block
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    memory: 8Gi
+
+secretStore:
+  name: openbao
+  kind: ClusterSecretStore
+
+# -- Extra container env, as a list of EnvVar.
+extraEnv: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

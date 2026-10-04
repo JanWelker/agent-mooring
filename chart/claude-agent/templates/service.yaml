@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "claude-agent.fullname" . }}
+  labels:
+    {{- include "claude-agent.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "claude-agent.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: ssh
+      port: 2222
+      targetPort: ssh
+      protocol: TCP

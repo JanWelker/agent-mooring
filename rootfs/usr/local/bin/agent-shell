@@ -1,0 +1,11 @@
+#!/bin/bash
+# sshd ForceCommand. No command: attach the tmux session. A command (ACP,
+# scp, rsync, sftp): run it as given.
+# shellcheck disable=SC1091
+. /etc/profile.d/agent-env.sh
+
+if [ -z "${SSH_ORIGINAL_COMMAND:-}" ]; then
+  /usr/local/bin/agent-session
+  exec tmux new -A -s main
+fi
+exec sh -c "$SSH_ORIGINAL_COMMAND"

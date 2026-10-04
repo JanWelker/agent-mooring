@@ -1,0 +1,28 @@
+session: homelab
+repo: JanWelker/homelab
+kubernetes:
+  access: write
+argocd:
+  enabled: true
+acp:
+  enabled: true
+ssh:
+  authorizedKeys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleExampleExampleExampleExampleExample user@laptop
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAnotherAnotherAnotherAnotherAnotherAnoth user@phone
+mcpServers:
+  context7:
+    type: http
+    url: https://mcp.context7.com/mcp
+extraEgressFQDNs:
+  - matchName: mcp.context7.com
+  - matchPattern: "*.pypi.org"
+    port: 443
+settings:
+  permissions:
+    defaultMode: auto
+claudeMd: |
+  # Rules
+  - No emojis in commit messages.
+persistence:
+  existingClaim: claude-homelab-old

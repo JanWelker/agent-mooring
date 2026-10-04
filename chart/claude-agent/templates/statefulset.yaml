@@ -1,0 +1,146 @@
+{{- $name := include "claude-agent.fullname" . }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "claude-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  serviceName: {{ $name }}
+  selector:
+    matchLabels:
+      {{- include "claude-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "claude-agent.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "claude-agent.serviceAccountName" . }}
+      automountServiceAccountToken: {{ ne .Values.kubernetes.access "none" }}
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: AGENT_SESSION
+              value: {{ .Values.session | quote }}
+            - name: AGENT_REPO
+              value: {{ .Values.repo | quote }}
+            - name: AGENT_KUBERNETES_ACCESS
+              value: {{ .Values.kubernetes.access | quote }}
+            {{- if .Values.repo }}
+            - name: GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-github
+                  key: token
+            {{- end }}
+            {{- if .Values.argocd.enabled }}
+            - name: ARGOCD_SERVER
+              value: {{ printf "%s:443" .Values.argocd.server | quote }}
+            - name: ARGOCD_OPTS
+              value: --grpc-web
+            - name: ARGOCD_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-argocd
+                  key: token
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: ssh
+              containerPort: 2222
+              protocol: TCP
+          startupProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec:
+                # Claude exits on SIGHUP and flushes the conversation, so
+                # --continue picks it up after the restart.
+                command: ["tmux", "kill-server"]
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+            - name: tmp
+              mountPath: /tmp
+            - name: managed
+              mountPath: /etc/claude-code
+              readOnly: true
+            - name: agent-config
+              mountPath: /etc/claude-agent
+              readOnly: true
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: {{ include "claude-agent.claimName" . }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 4Gi
+        - name: managed
+          configMap:
+            name: {{ $name }}
+            items:
+              - key: managed-settings.json
+                path: managed-settings.json
+              {{- if .Values.claudeMd }}
+              - key: CLAUDE.md
+                path: CLAUDE.md
+              {{- end }}
+        - name: agent-config
+          configMap:
+            name: {{ $name }}
+            items:
+              - key: authorized_keys
+                path: authorized_keys
+              - key: mcp.json
+                path: mcp.json
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,91 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "claude-agent.fullname" . }}
+  labels:
+    {{- include "claude-agent.labels" . | nindent 4 }}
+spec:
+  description: >-
+    SSH from the Gateway and the node's probes in; out, only Claude Code's
+    own hosts plus what the session's toggles add.
+  endpointSelector:
+    matchLabels:
+      {{- include "claude-agent.selectorLabels" . | nindent 6 }}
+  ingress:
+    - fromEntities:
+        - ingress
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "2222"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
+    # Claude Code: API, sign-in, Remote Control, connectors, docs, changelog,
+    # feature flags and telemetry (code.claude.com/docs/en/network-config).
+    - toFQDNs:
+        - matchName: api.anthropic.com
+        - matchName: claude.ai
+        - matchName: claude.com
+        - matchName: platform.claude.com
+        - matchName: downloads.claude.ai
+        - matchName: statsig.anthropic.com
+        - matchName: mcp-proxy.anthropic.com
+        - matchName: code.claude.com
+        - matchName: raw.githubusercontent.com
+        - matchPattern: "*.frame.claudeusercontent.com"
+        - matchName: http-intake.logs.us5.datadoghq.com
+        - matchName: browser-intake-us5-datadoghq.com
+      {{- include "claude-agent.https" . | nindent 6 }}
+    {{- if .Values.repo }}
+    - toFQDNs:
+        - matchName: github.com
+        - matchName: api.github.com
+        - matchPattern: "*.githubusercontent.com"
+        - matchName: ghcr.io
+        - matchName: pkg-containers.githubusercontent.com
+      {{- include "claude-agent.https" . | nindent 6 }}
+    {{- end }}
+    {{- if or .Values.acp.enabled .Values.mcpServers }}
+    - toFQDNs:
+        - matchName: registry.npmjs.org
+      {{- include "claude-agent.https" . | nindent 6 }}
+    {{- end }}
+    {{- if ne .Values.kubernetes.access "none" }}
+    - toEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "6443"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+    {{- end }}
+    {{- if .Values.argocd.enabled }}
+    - toFQDNs:
+        - matchName: {{ .Values.argocd.server }}
+      {{- include "claude-agent.https" . | nindent 6 }}
+    {{- end }}
+    {{- range .Values.extraEgressFQDNs }}
+    - toFQDNs:
+        {{- if .matchName }}
+        - matchName: {{ .matchName | quote }}
+        {{- else }}
+        - matchPattern: {{ .matchPattern | quote }}
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: {{ .port | default 443 | toString | quote }}
+              protocol: TCP
+    {{- end }}
