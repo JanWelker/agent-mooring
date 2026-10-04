@@ -11,10 +11,13 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # hadolint ignore=DL3008
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg jq \
  && rm -rf /var/lib/apt/lists/*
 
 ARG CLAUDE_CODE_VERSION
+# Anthropic's Claude Code release signing key, from
+# https://code.claude.com/docs/en/setup#binary-integrity-and-code-signing
+ARG CLAUDE_CODE_KEY=31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
 # renovate: datasource=github-releases depName=kubernetes/kubernetes extractVersion=^v(?<version>.*)$
 ARG KUBECTL_VERSION=1.37.1
 # renovate: datasource=github-releases depName=helm/helm extractVersion=^v(?<version>.*)$
@@ -28,22 +31,52 @@ ARG HUBBLE_VERSION=1.19.4
 # renovate: datasource=github-releases depName=openbao/openbao extractVersion=^v(?<version>.*)$
 ARG OPENBAO_VERSION=2.7.1
 
-WORKDIR /out
+# The release binary, checked against the manifest whose signature must come
+# from the pinned key: GnuPG's VALIDSIG line ends in the primary key's
+# fingerprint.
+WORKDIR /dl
+RUN case "$(dpkg --print-architecture)" in amd64) p=linux-x64 ;; arm64) p=linux-arm64 ;; esac \
+ && base="https://downloads.claude.ai/claude-code-releases/${CLAUDE_CODE_VERSION}" \
+ && GNUPGHOME="$(mktemp -d)" && export GNUPGHOME \
+ && curl -fsSL https://downloads.claude.ai/keys/claude-code.asc | gpg --batch -q --import \
+ && curl -fsSLO "$base/manifest.json" -O "$base/manifest.json.sig" \
+ && gpg --batch --status-fd 1 --verify manifest.json.sig manifest.json 2>/dev/null \
+      | grep -E "^\[GNUPG:\] VALIDSIG .* ${CLAUDE_CODE_KEY}$" >/dev/null \
+ && curl -fsSLo claude "$base/$p/claude" \
+ && echo "$(jq -er --arg p "$p" '.platforms[$p].checksum' manifest.json)  claude" | sha256sum -c --quiet - \
+ && install -D -m 0755 claude /out/claude \
+ && /out/claude --version | grep -F "${CLAUDE_CODE_VERSION}" \
+ && rm -rf /dl/* "$GNUPGHOME"
 
-# The native installer, pinned to the release; the launcher it leaves in
-# ~/.local/bin is a symlink into ~/.local/share/claude/versions.
-RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
- && cp -L /root/.local/bin/claude /out/claude \
- && /out/claude --version | grep -F "${CLAUDE_CODE_VERSION}"
-
+# Each download is checked against the checksum file its project publishes.
 RUN ARCH="$(dpkg --print-architecture)" \
- && curl -fsSLo kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \
- && curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar -xzO "linux-${ARCH}/helm" > helm \
- && curl -fsSLo /argocd "https://github.com/argoproj/argo-cd/releases/download/v${ARGOCD_VERSION}/argocd-linux-${ARCH}" \
- && curl -fsSL "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-${ARCH}.tar.gz" | tar -xz cilium \
- && curl -fsSL "https://github.com/cilium/hubble/releases/download/v${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz" | tar -xz hubble \
- && curl -fsSL "https://github.com/openbao/openbao/releases/download/v${OPENBAO_VERSION}/openbao_${OPENBAO_VERSION}_linux_${ARCH}.tar.gz" | tar -xz bao \
- && chmod 0755 /out/* /argocd
+ && gh="https://github.com" \
+ && k8s="https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \
+ && curl -fsSLO "$k8s" \
+ && echo "$(curl -fsSL "$k8s.sha256")  kubectl" | sha256sum -c --quiet - \
+ && curl -fsSLO "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" \
+      -O "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz.sha256sum" \
+ && sha256sum -c --quiet "helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz.sha256sum" \
+ && curl -fsSLO "$gh/argoproj/argo-cd/releases/download/v${ARGOCD_VERSION}/argocd-linux-${ARCH}" \
+      -O "$gh/argoproj/argo-cd/releases/download/v${ARGOCD_VERSION}/cli_checksums.txt" \
+ && grep -E "  argocd-linux-${ARCH}$" cli_checksums.txt | sha256sum -c --quiet - \
+ && curl -fsSLO "$gh/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-${ARCH}.tar.gz" \
+      -O "$gh/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-${ARCH}.tar.gz.sha256sum" \
+ && sha256sum -c --quiet "cilium-linux-${ARCH}.tar.gz.sha256sum" \
+ && curl -fsSLO "$gh/cilium/hubble/releases/download/v${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz" \
+      -O "$gh/cilium/hubble/releases/download/v${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz.sha256sum" \
+ && sha256sum -c --quiet "hubble-linux-${ARCH}.tar.gz.sha256sum" \
+ && curl -fsSLO "$gh/openbao/openbao/releases/download/v${OPENBAO_VERSION}/openbao_${OPENBAO_VERSION}_linux_${ARCH}.tar.gz" \
+      -O "$gh/openbao/openbao/releases/download/v${OPENBAO_VERSION}/checksums.txt" \
+ && grep -E "  openbao_${OPENBAO_VERSION}_linux_${ARCH}\.tar\.gz$" checksums.txt | sha256sum -c --quiet - \
+ && install -m 0755 kubectl /out/kubectl \
+ && tar -xzO -f "helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" "linux-${ARCH}/helm" > /out/helm \
+ && install -m 0755 "argocd-linux-${ARCH}" /argocd \
+ && tar -xz -C /out -f "cilium-linux-${ARCH}.tar.gz" cilium \
+ && tar -xz -C /out -f "hubble-linux-${ARCH}.tar.gz" hubble \
+ && tar -xz -C /out -f "openbao_${OPENBAO_VERSION}_linux_${ARCH}.tar.gz" bao \
+ && chmod 0755 /out/* \
+ && rm -rf /dl/*
 
 FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 

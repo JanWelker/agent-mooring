@@ -34,6 +34,12 @@ shared-writable without the sticky bit.
 | Node.js | `node`, `npm`, `npx` for MCP servers; `claude-agent-acp`, also as `claude-code-acp` |
 | Cluster | kubectl, helm, argocd, cilium, hubble, bao |
 
+The build verifies every download: Claude Code against its release manifest,
+whose GPG signature must come from Anthropic's
+[release signing key](https://code.claude.com/docs/en/setup#binary-integrity-and-code-signing)
+(fingerprint pinned in the `Dockerfile`), and each CLI against the checksum
+file its project publishes.
+
 The entrypoint ([`entrypoint.sh`](rootfs/usr/local/bin/entrypoint.sh)) runs on
 every start and is idempotent:
 
