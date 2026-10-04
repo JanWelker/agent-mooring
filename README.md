@@ -70,7 +70,9 @@ every start and is idempotent:
    so sshd always starts.
 4. Merges `/etc/claude-agent/mcp.json` into `~/.claude.json`, removing servers
    the chart set before and no longer lists (tracked in
-   `~/.claude/agent-mcp-servers.json`).
+   `~/.claude/agent-mcp-servers.json`). Marks `$HOME` and each cloned
+   repository trusted there, so Claude does not ask on every start; Claude
+   never saves an answer given in `$HOME` itself.
 5. With `AGENT_APPA=true`: runs `appa plugin install claude-code` for the
    image's `appa` version when that version is not deployed yet. It writes
    OpenAPPA's hooks to `~/.claude/settings.json`, the `appa` MCP server, the
