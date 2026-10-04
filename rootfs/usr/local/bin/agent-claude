@@ -1,0 +1,29 @@
+#!/bin/bash
+# The command in the tmux pane "main": Claude Code with Remote Control,
+# restarted whenever it exits, so the session never silently drops out of
+# the Claude apps. Ctrl-C during the pause, or the file ~/.claude-agent-hold,
+# leaves a shell in the pane instead.
+name="claude-${AGENT_SESSION:-agent}"
+hold="$HOME/.claude-agent-hold"
+delay=5
+
+trap 'echo; exec bash -l' INT
+
+while [ ! -e "$hold" ]; do
+  start=$SECONDS
+  # --continue fails on the first start, when there is no conversation yet.
+  claude --remote-control "$name" --name "$name" --continue ||
+    claude --remote-control "$name" --name "$name"
+  # A Claude that keeps dying right away backs off to 5 minutes.
+  if [ $((SECONDS - start)) -lt 60 ]; then
+    delay=$((delay * 2 > 300 ? 300 : delay * 2))
+  else
+    delay=5
+  fi
+  [ -e "$hold" ] && break
+  echo "Claude exited; restarting in ${delay}s. Ctrl-C for a shell."
+  sleep "$delay"
+done
+
+echo "$hold exists; not restarting Claude. Remove it and run agent-claude."
+exec bash -l

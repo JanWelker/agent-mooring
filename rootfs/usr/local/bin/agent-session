@@ -7,10 +7,7 @@ if tmux has-session -t main 2>/dev/null; then
   exit 0
 fi
 
-name="claude-${AGENT_SESSION:-agent}"
 workdir="$(cat /tmp/agent/workdir 2>/dev/null || echo "$HOME")"
 
-# --continue fails on the first start, when there is no conversation yet.
-# The trailing shell keeps the session alive after Claude exits.
-tmux new-session -d -s main -c "$workdir" \
-  "claude --remote-control '$name' --name '$name' --continue || claude --remote-control '$name' --name '$name'; exec bash -l"
+# agent-claude restarts Claude whenever it exits.
+tmux new-session -d -s main -c "$workdir" /usr/local/bin/agent-claude

@@ -54,6 +54,8 @@ every start and is idempotent:
 6. Starts tmux session `main` with
    `claude --remote-control claude-<session> --continue`, in the repository
    directory when there is exactly one repository, otherwise in `~`.
+   [`agent-claude`](rootfs/usr/local/bin/agent-claude) restarts Claude
+   whenever it exits, backing off up to 5 minutes when it keeps failing.
 7. Execs `sshd -D` on `127.0.0.1:2223` with a config generated in `/tmp/agent`.
 
 An SSH login without a command attaches `main`; a login with a command runs it,
@@ -143,7 +145,10 @@ Host *.ssh.wlkr.ch
 ```
 
 Then `ssh <session>.ssh.wlkr.ch` attaches the tmux session. Detach with
-`C-b d`; Claude keeps running.
+`C-b d`; Claude keeps running. After `/exit` Claude comes back within seconds;
+press Ctrl-C during the pause for a shell in the pane instead, or
+`touch ~/.claude-agent-hold` to stop restarts until the file is removed and
+`agent-claude` is run again.
 
 ## First run
 
