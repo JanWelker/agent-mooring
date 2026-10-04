@@ -198,6 +198,21 @@ if [ -r "$MCP_SRC" ]; then
   fi
 fi
 
+# The session's own folders are trusted, so Claude does not ask on every
+# start: $HOME, where the session starts with several repositories (Claude
+# never saves an answer given there), and each cloned repository.
+state="$HOME/.claude.json"
+[ -s "$state" ] || echo '{}' > "$state"
+# The file goes before --args, which turns every later word into an argument.
+if jq '.projects = reduce $ARGS.positional[] as $d
+    ((.projects // {}); .[$d].hasTrustDialogAccepted = true)' \
+    "$state" --args "$HOME" "${cloned[@]}" < /dev/null > "$state.tmp"; then
+  mv "$state.tmp" "$state"
+else
+  log "could not mark the session's folders trusted in $state"
+  rm -f "$state.tmp"
+fi
+
 # 3c. OpenAPPA (https://openappa.com). `appa plugin install claude-code`
 # writes its hooks to ~/.claude/settings.json, the `appa` MCP server, the
 # appa-guide skill, the policy in ~/.config/appa, and the runtime and the
