@@ -78,7 +78,8 @@ every start and is idempotent:
    OpenAPPA's hooks to `~/.claude/settings.json`, the `appa` MCP server, the
    `appa-guide` skill (excluded from git in the skills checkout), the policy in
    `~/.config/appa`, and the runtime and `clappa` under `~/.local`; an
-   existing policy is kept. Turned off again, `appa plugin remove claude-code`
+   existing policy is kept. A set `appa.policy` then replaces the policy when
+   it loads. Turned off again, `appa plugin remove claude-code`
    drops the registration and keeps the policy.
 6. Writes the container environment to `/tmp/agent/env`, which login shells
    source, since sshd does not pass it on.
@@ -123,6 +124,7 @@ minute of a renewal; open connections keep running.
 | `tls.issuerRef` | `letsencrypt-prod`, `ClusterIssuer` | Issuer of the `claude-<session>-tls` certificate the sidecar serves when `tls.existingSecret` is empty |
 | `acp.enabled` | `false` | Opens npm registry egress for ACP clients |
 | `appa.enabled` | `false` | Protects the main session with [OpenAPPA](https://openappa.com): installs its Claude Code plugin on start and runs Claude under `clappa`. Only that session is gated; ACP and `claude` started by hand are not. Run `/appa-guide` in it once to tune the policy |
+| `appa.policy` | `""` | Root OpenAPPA policy (`appa.toml`). When set, it replaces `~/.config/appa/appa.toml` on start if it loads, keeping the old file as `appa.toml.bak`; one that does not load leaves the current policy. Changing it restarts the pod. Empty leaves the policy on the PVC |
 | `mcpServers` | `{}` | User-scope MCP servers, `.mcp.json` format, merged into `~/.claude.json` on start. A server removed here is removed there; servers added by hand are kept |
 | `extraEgressFQDNs` | `[]` | `[{matchName: host, port: 443}]` or `[{matchPattern: "*.host"}]` |
 | `settings` | `{}` | Merged over the default `managed-settings.json` |

@@ -9,6 +9,10 @@ data:
     {{- include "claude-agent.managedSettings" . | nindent 4 }}
   CLAUDE.md: |
     {{- .Values.claudeMd | nindent 4 }}
+  {{- if .Values.appa.policy }}
+  appa.toml: |
+    {{- .Values.appa.policy | nindent 4 }}
+  {{- end }}
   mcp.json: |
     {{- dict "mcpServers" .Values.mcpServers | toPrettyJson | nindent 4 }}
   authorized_keys: |

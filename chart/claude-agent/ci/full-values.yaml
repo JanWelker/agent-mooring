@@ -8,6 +8,11 @@ acp:
   enabled: true
 appa:
   enabled: true
+  policy: |
+    include = ["batteries/claude-code/appa.toml"]
+
+    [policy]
+    version = 2
 ssh:
   authorizedKeys:
     - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleExampleExampleExampleExampleExample user@laptop
