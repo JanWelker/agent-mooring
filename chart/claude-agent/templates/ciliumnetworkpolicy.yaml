@@ -15,7 +15,6 @@ spec:
     - fromEntities:
         - ingress
         - host
-        - remote-node
       toPorts:
         - ports:
             - port: "2222"

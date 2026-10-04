@@ -48,7 +48,9 @@ every start and is idempotent:
    deleted), or fast-forwards an existing checkout; a pull that cannot
    fast-forward is logged and left alone. Network steps run under `timeout`,
    so sshd always starts.
-4. Merges `/etc/claude-agent/mcp.json` into `~/.claude.json`.
+4. Merges `/etc/claude-agent/mcp.json` into `~/.claude.json`, removing servers
+   the chart set before and no longer lists (tracked in
+   `~/.claude/agent-mcp-servers.json`).
 5. Writes the container environment to `/tmp/agent/env`, which login shells
    source, since sshd does not pass it on.
 6. Starts tmux session `main` with
@@ -74,7 +76,7 @@ minute of a renewal; open connections keep running.
 | `session` | required | DNS label. Resources are `claude-<session>`; SSH host `<session>.<ssh.domain>` |
 | `repos` | `[]` | `owner/name` list, each cloned once into `~/<name>`. One PAT covers all. Empty (and no `repo` or `skills.repo`): no PAT, no clone, no GitHub egress |
 | `skills.repo` | `""` | `owner/name` of the shared skills repository, cloned to `~/.claude/skills` and fast-forwarded on start and at each session start. Its root has the layout of `~/.claude/skills`. The PAT must cover it; set alone, it still gets the PAT and GitHub egress |
-| `skills.ref` | `main` | Branch cloned |
+| `skills.ref` | `main` | Branch cloned. A changed value is checked out on the next start, unless the checkout has local changes |
 | `repo` | `""` | Deprecated alias: appended to `repos`, duplicates dropped |
 | `image.digest` | `""` | `sha256:...` manifest digest appended to the tag. The release workflow sets it in the published chart, so a re-pushed tag is pulled again despite `IfNotPresent` |
 | `image.repository` | `ghcr.io/janwelker/claude-agent` | |
@@ -86,9 +88,10 @@ minute of a renewal; open connections keep running.
 | `ssh.authorizedKeys` | `[]` | Public key lines |
 | `ssh.gateway` | `apps-gateway`/`kube-system`/`ssh` | `TLSRoute` parent: name, namespace, sectionName |
 | `ssh.domain` | `ssh.wlkr.ch` | |
-| `tls.issuerRef` | `letsencrypt-prod`, `ClusterIssuer` | Issuer of the `claude-<session>-tls` certificate the sidecar serves |
+| `tls.existingSecret` | `""` | A `kubernetes.io/tls` Secret in the namespace to serve instead of a per-session certificate, for example one `*.<ssh.domain>` wildcard for all sessions; no `Certificate` is created, and the session name stays out of certificate transparency logs |
+| `tls.issuerRef` | `letsencrypt-prod`, `ClusterIssuer` | Issuer of the `claude-<session>-tls` certificate the sidecar serves when `tls.existingSecret` is empty |
 | `acp.enabled` | `false` | Opens npm registry egress for ACP clients |
-| `mcpServers` | `{}` | User-scope MCP servers, `.mcp.json` format |
+| `mcpServers` | `{}` | User-scope MCP servers, `.mcp.json` format, merged into `~/.claude.json` on start. A server removed here is removed there; servers added by hand are kept |
 | `extraEgressFQDNs` | `[]` | `[{matchName: host, port: 443}]` or `[{matchPattern: "*.host"}]` |
 | `settings` | `{}` | Merged over the default `managed-settings.json` |
 | `claudeMd` | `""` | Managed `CLAUDE.md` for every session in the pod |
@@ -120,8 +123,9 @@ default list.
 
 ### Network policy
 
-The `CiliumNetworkPolicy` lets port 2222 in from the `ingress`, `host` and
-`remote-node` entities, and lets out:
+The `CiliumNetworkPolicy` lets port 2222 in from the `ingress` entity (the
+Gateway, on any node) and `host` (the kubelet's startup probe of the sidecar),
+and lets out:
 
 | Egress | When |
 | --- | --- |

@@ -129,6 +129,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "existingSecret": {
+          "type": "string",
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
         "issuerRef": {
           "type": "object",
           "additionalProperties": false,

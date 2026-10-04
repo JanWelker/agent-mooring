@@ -125,6 +125,17 @@ if [ -n "$SKILLS_REPO" ]; then
   if [ -z "${GH_TOKEN:-}" ]; then
     log "skills repo $SKILLS_REPO set but GH_TOKEN is empty; not cloning"
   elif [ -e "$SKILLS_DIR/.git" ]; then
+    # Follow a changed skills.ref: switch only when the checkout is clean.
+    if [ "$(git -C "$SKILLS_DIR" symbolic-ref -q --short HEAD || true)" != "$SKILLS_REF" ]; then
+      if [ -n "$(git -C "$SKILLS_DIR" status --porcelain 2>/dev/null)" ]; then
+        log "skills checkout has local changes; not switching to $SKILLS_REF"
+      elif timeout 60 git -C "$SKILLS_DIR" fetch -q origin "$SKILLS_REF" \
+        && git -C "$SKILLS_DIR" checkout -q "$SKILLS_REF"; then
+        log "skills switched to $SKILLS_REF"
+      else
+        log "could not switch skills to $SKILLS_REF; leaving the checkout as is"
+      fi
+    fi
     if timeout 60 git -C "$SKILLS_DIR" pull --ff-only -q; then
       log "skills $SKILLS_REPO pulled (fast-forward only)"
     else
@@ -157,12 +168,27 @@ fi
 echo "$WORKDIR" > "$RUNTIME_DIR/workdir"
 
 # User-scope MCP servers from the chart, merged into ~/.claude.json while
-# Claude is not running yet; servers added by hand are kept.
-if [ -s "$MCP_SRC" ]; then
+# Claude is not running yet. The names the chart set last time are kept in
+# ~/.claude/agent-mcp-servers.json, so a server dropped from the chart is
+# removed; servers added by hand are kept.
+if [ -r "$MCP_SRC" ]; then
   state="$HOME/.claude.json"
+  managed="$HOME/.claude/agent-mcp-servers.json"
+  mkdir -p "$HOME/.claude"
   [ -s "$state" ] || echo '{}' > "$state"
-  jq --slurpfile m "$MCP_SRC" '.mcpServers = ((.mcpServers // {}) + ($m[0].mcpServers // {}))' \
-    "$state" > "$state.tmp" && mv "$state.tmp" "$state"
+  [ -s "$managed" ] || echo '[]' > "$managed"
+  if jq --slurpfile m "$MCP_SRC" --slurpfile prev "$managed" '
+      ($m[0].mcpServers // {}) as $new
+      | .mcpServers = (((.mcpServers // {})
+          | with_entries(select(.key as $k | ($prev[0] | index($k)) == null)))
+        + $new)' "$state" > "$state.tmp" \
+    && jq '.mcpServers // {} | keys' "$MCP_SRC" > "$managed.tmp"; then
+    mv "$state.tmp" "$state"
+    mv "$managed.tmp" "$managed"
+  else
+    log "could not merge MCP servers from $MCP_SRC; ~/.claude.json left unchanged"
+    rm -f "$state.tmp" "$managed.tmp"
+  fi
 fi
 
 # 4. The long-running Claude session.

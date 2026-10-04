@@ -18,6 +18,8 @@ env:
   HELM_VERSION: v4.3.0
   # renovate: datasource=github-releases depName=yannh/kubeconform
   KUBECONFORM_VERSION: v0.8.0
+  # renovate: datasource=git-refs depName=https://github.com/datreeio/CRDs-catalog currentValue=main
+  CRDS_CATALOG_REF: 4c8dc296d32b06d15ccde9668ff136c951f4d539
 
 jobs:
   hadolint:
@@ -51,7 +53,7 @@ jobs:
             helm template claude chart/claude-agent -n claude-agents -f "$f" \
               | kubeconform -strict -summary \
                   -schema-location default \
-                  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+                  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/${{ env.CRDS_CATALOG_REF }}/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
             echo "::endgroup::"
           done
       - name: Schema rejects bad values

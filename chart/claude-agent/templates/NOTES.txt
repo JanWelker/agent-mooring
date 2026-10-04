@@ -2,7 +2,7 @@
 Claude agent {{ include "claude-agent.fullname" . }} (Claude Code {{ .Values.image.tag | default .Chart.AppVersion }}).
 
 1. Add this once to ~/.ssh/config. The Gateway passes TLS through; the pod's
-   tls sidecar terminates it with certificate {{ include "claude-agent.fullname" . }}-tls.
+   tls sidecar terminates it with Secret {{ include "claude-agent.tlsSecretName" . }}.
 
    Host *.{{ .Values.ssh.domain }}
      User agent
