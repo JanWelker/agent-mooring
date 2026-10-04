@@ -12,12 +12,25 @@ ssh -> openssl s_client -> :443 Gateway (TLS passthrough, SNI <session>.ssh.wlkr
 
 | Artifact | Reference |
 | --- | --- |
-| Image | `ghcr.io/janwelker/claude-agent:<claude-code-version>` (amd64, arm64) |
+| Image | `ghcr.io/janwelker/claude-agent:<claude-code-version>[-<build>]` (amd64, arm64) |
 | Chart | `oci://ghcr.io/janwelker/charts/claude-agent` |
 
 A release workflow checks npm every hour. Each new Claude Code version gets an
 image tagged with that version and a chart whose `appVersion` is that version,
-so an instance only ever bumps the chart version.
+so an instance only ever bumps the chart version. A change to `Dockerfile`,
+`rootfs/` or `chart/` merged to `main` is released at once as a new build of
+the current version, `<version>-2`, `-3` and so on; no tag is ever pushed twice.
+
+The image is pushed by digest and tagged only after a smoke test and a Trivy
+scan that fails on any fixable CRITICAL finding; fixable HIGH and CRITICAL
+findings are listed in the release notes. The image carries SLSA provenance and
+an SBOM, and image and chart are signed with cosign, keyless:
+
+```bash
+cosign verify ghcr.io/janwelker/claude-agent:<tag> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/JanWelker/claude-agent/\.github/workflows/release\.yml@'
+```
 
 ## Image
 

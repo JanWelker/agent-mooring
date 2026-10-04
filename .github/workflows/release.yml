@@ -1,12 +1,21 @@
 ---
-# Builds the image and chart for every Claude Code release: the image tag is
-# the Claude Code version, the chart's appVersion follows it, and the chart's
-# patch version moves by one per publish.
+# Builds the image and chart for every Claude Code release, and again for
+# every change to the image or chart on main. The image tag is the Claude
+# Code version, with -<n> from the second build of that version on; the
+# chart's appVersion follows it, and the chart's patch version moves by one
+# per publish. Nothing is tagged before the smoke test and the Trivy gate
+# pass; image and chart are signed with cosign.
 name: Release
 
 "on":
   schedule:
     - cron: "23 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - rootfs/**
+      - chart/**
   workflow_dispatch:
     inputs:
       version:
@@ -14,7 +23,7 @@ name: Release
         required: false
         default: ""
       force:
-        description: Rebuild and publish a new chart even if the tag exists
+        description: Build and publish a new -<n> build even if the version was released
         type: boolean
         default: false
 
@@ -30,18 +39,22 @@ env:
   CHART_REGISTRY: oci://ghcr.io/janwelker/charts
   # renovate: datasource=github-releases depName=helm/helm
   HELM_VERSION: v4.3.0
+  # renovate: datasource=github-releases depName=sigstore/cosign
+  COSIGN_VERSION: v3.1.3
 
 jobs:
   check:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
       release: ${{ steps.check.outputs.release }}
     steps:
       - id: check
         env:
           INPUT_VERSION: ${{ inputs.version }}
-          FORCE: ${{ inputs.force }}
+          # A push to main means the image or chart changed: always rebuild.
+          REBUILD: ${{ inputs.force || github.event_name == 'push' }}
           REPO: ${{ github.repository }}
         run: |
           version="${INPUT_VERSION:-$(npm view @anthropic-ai/claude-code version)}"
@@ -49,12 +62,21 @@ jobs:
             echo "unexpected version '$version'" >&2
             exit 1
           fi
+          tags="$(git ls-remote --tags --refs "https://github.com/${REPO}.git" "refs/tags/v${version}*" | sed 's|.*refs/tags/v||')"
           release=true
-          if git ls-remote --exit-code --tags "https://github.com/${REPO}.git" "refs/tags/v${version}" >/dev/null; then
-            release="${FORCE:-false}"
+          tag="$version"
+          if grep -qx "$version" <<<"$tags"; then
+            if [ "$REBUILD" = true ]; then
+              # Builds are numbered from 2; the first one has no suffix.
+              last="$(awk -v p="${version}-" 'index($0, p) == 1 && substr($0, length(p) + 1) ~ /^[0-9]+$/ { print substr($0, length(p) + 1) }' <<<"$tags" | sort -n | tail -n1)"
+              tag="${version}-$(( ${last:-1} + 1 ))"
+            else
+              release=false
+            fi
           fi
-          echo "Claude Code ${version}: release=${release}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Claude Code ${version}: release=${release} tag=${tag}" >> "$GITHUB_STEP_SUMMARY"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "release=${release}" >> "$GITHUB_OUTPUT"
 
   release:
@@ -64,8 +86,11 @@ jobs:
     permissions:
       contents: write
       packages: write
+      # Keyless cosign signatures.
+      id-token: write
     env:
       VERSION: ${{ needs.check.outputs.version }}
+      TAG: ${{ needs.check.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -80,16 +105,22 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: ${{ env.HELM_VERSION }}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
 
+      # Pushed by digest only; the tag follows once the checks below pass.
       - name: Build and push the image
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.IMAGE }}:${{ env.VERSION }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           build-args: CLAUDE_CODE_VERSION=${{ env.VERSION }}
+          labels: org.opencontainers.image.version=${{ env.TAG }}
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -101,7 +132,18 @@ jobs:
           docker run --rm --read-only --user 1000:1000 --tmpfs /tmp --tmpfs /home/agent:uid=1000,gid=1000 \
             "${IMAGE}@${DIGEST}" check
 
-      - name: Trivy
+      # Blocks the release: a fixable CRITICAL means a rebuild or a base
+      # image bump is due before anything is tagged.
+      - name: Trivy gate, fixable CRITICAL
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+      - name: Trivy report, fixable HIGH and CRITICAL
         continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -111,6 +153,18 @@ jobs:
           exit-code: "0"
           format: table
           output: trivy.txt
+
+      - name: Tag and sign the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker buildx imagetools create -t "${IMAGE}:${TAG}" "${IMAGE}@${DIGEST}"
+          tagged="$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{json .Manifest}}' | jq -r .digest)"
+          if [ "$tagged" != "$DIGEST" ]; then
+            echo "${IMAGE}:${TAG} is ${tagged}, expected ${DIGEST}" >&2
+            exit 1
+          fi
+          cosign sign --yes "${IMAGE}@${DIGEST}"
 
       - name: Package and push the chart
         id: chart
@@ -125,13 +179,19 @@ jobs:
           else
             chart_version="$base"
           fi
-          yq -i ".version = \"${chart_version}\" | .appVersion = \"${VERSION}\"" chart/claude-agent/Chart.yaml
-          # Pin the packaged chart to the image just pushed: a forced release
-          # re-pushes the same tag, which IfNotPresent nodes would never re-pull.
+          yq -i ".version = \"${chart_version}\" | .appVersion = \"${TAG}\"" chart/claude-agent/Chart.yaml
+          # Pin the packaged chart to the image just pushed, so the digest,
+          # not the tag, decides what runs.
           yq -i ".image.digest = \"${DIGEST}\"" chart/claude-agent/values.yaml
           helm package chart/claude-agent -d dist
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-          helm push "dist/claude-agent-${chart_version}.tgz" "$CHART_REGISTRY"
+          helm push "dist/claude-agent-${chart_version}.tgz" "$CHART_REGISTRY" 2>&1 | tee push.txt
+          chart_digest="$(awk '/^Digest:/ {print $2}' push.txt)"
+          if [[ ! "$chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "no chart digest in the helm push output" >&2
+            exit 1
+          fi
+          cosign sign --yes "${CHART_REGISTRY#oci://}/claude-agent@${chart_digest}"
           git checkout -- chart/claude-agent/Chart.yaml chart/claude-agent/values.yaml
           echo "version=${chart_version}" >> "$GITHUB_OUTPUT"
 
@@ -146,13 +206,19 @@ jobs:
           git tag "chart-${CHART_VERSION}"
           git push origin "chart-${CHART_VERSION}"
           {
-            echo "Claude Code ${VERSION}."
+            if [ "$TAG" = "$VERSION" ]; then
+              echo "Claude Code ${VERSION}."
+            else
+              echo "Claude Code ${VERSION}, rebuilt from ${GITHUB_SHA::7}."
+            fi
             echo
             echo "| Artifact | Reference |"
             echo "| --- | --- |"
-            echo "| Image | \`${IMAGE}:${VERSION}\` |"
+            echo "| Image | \`${IMAGE}:${TAG}\` |"
             echo "| Image digest | \`${IMAGE}@${DIGEST}\` |"
             echo "| Chart | \`${CHART_REGISTRY}/claude-agent\` version \`${CHART_VERSION}\` |"
+            echo
+            echo "Both are signed with cosign by this workflow; see the README for \`cosign verify\`."
             echo
             echo "Changes in Claude Code: https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md"
             if [ -s trivy.txt ]; then
@@ -166,10 +232,8 @@ jobs:
             fi
           } > notes.md
           cat notes.md >> "$GITHUB_STEP_SUMMARY"
-          if gh release view "v${VERSION}" >/dev/null 2>&1; then
-            gh release edit "v${VERSION}" --notes-file notes.md
-          else
-            git tag "v${VERSION}"
-            git push origin "v${VERSION}"
-            gh release create "v${VERSION}" --title "Claude Code ${VERSION}" --notes-file notes.md --verify-tag
-          fi
+          title="Claude Code ${VERSION}"
+          [ "$TAG" = "$VERSION" ] || title="${title} (build ${TAG##*-})"
+          git tag "v${TAG}"
+          git push origin "v${TAG}"
+          gh release create "v${TAG}" --title "$title" --notes-file notes.md --verify-tag
