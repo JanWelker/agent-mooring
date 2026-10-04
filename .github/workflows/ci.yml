@@ -83,6 +83,7 @@ jobs:
         run: |
           docker run --rm --entrypoint claude claude-agent:ci --version
           docker run --rm --entrypoint kubectl claude-agent:ci version --client
+          docker run --rm --entrypoint argocd claude-agent:ci version --client
           for t in helm argocd cilium hubble bao gh node socat claude-code-acp; do
             docker run --rm --entrypoint bash claude-agent:ci -c "command -v $t"
           done
@@ -108,9 +109,11 @@ jobs:
             -subj /CN=ci.ssh.test -addext subjectAltName=DNS:ci.ssh.test \
             -keyout tls/tls.key -out tls/tls.crt 2>/dev/null
           chmod 0644 tls/*
+          mkdir -p tokens && echo ci-token-1 > tokens/github-token
           docker run -d --name agent --read-only --user 1000:1000 \
             --tmpfs /tmp --tmpfs /home/agent:uid=1000,gid=1000 \
             -v "$PWD/keys:/etc/claude-agent:ro" -v "$PWD/tls:/tls:ro" -e AGENT_SESSION=ci \
+            -v "$PWD/tokens:/var/run/secrets/claude-agent:ro" \
             -p 2222:2222 claude-agent:ci
           docker exec -d agent /usr/local/bin/tls-proxy
           # docker-proxy accepts on the host before anything listens inside.
@@ -118,10 +121,20 @@ jobs:
             docker exec agent bash -c '</dev/tcp/127.0.0.1/2223 && </dev/tcp/127.0.0.1/2222' 2>/dev/null && break
             sleep 1
           done
-          ssh -i keys/id -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o ProxyCommand='openssl s_client -quiet -servername ci.ssh.test -connect localhost:2222' \
-            agent@ci.ssh.test 'id -u; tmux has-session -t main && echo tmux-ok; claude --version' | tee out.txt
+          ssh_agent() {
+            ssh -i keys/id -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ProxyCommand='openssl s_client -quiet -servername ci.ssh.test -connect localhost:2222' \
+              agent@ci.ssh.test "$@"
+          }
+          ssh_agent 'id -u; tmux has-session -t main && echo tmux-ok; claude --version' | tee out.txt
           grep -qx 1000 out.txt && grep -qx tmux-ok out.txt
+          # git and gh read the token file per call: a rotation needs no restart.
+          creds='printf "protocol=https\nhost=github.com\n\n" | git credential fill | grep ^password=; gh auth token'
+          ssh_agent "$creds" | tee out.txt
+          [ "$(cat out.txt)" = "$(printf 'password=ci-token-1\nci-token-1')" ]
+          echo ci-token-2 > tokens/github-token
+          ssh_agent "$creds" | tee out.txt
+          [ "$(cat out.txt)" = "$(printf 'password=ci-token-2\nci-token-2')" ]
       - name: Container logs
         if: always()
         run: docker logs agent || true

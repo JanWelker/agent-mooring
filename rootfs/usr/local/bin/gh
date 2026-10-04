@@ -1,0 +1,7 @@
+#!/bin/bash
+# gh with the current GitHub token; see agent-token. git's credential helper
+# points here too, so pushes pick up a rotated token.
+if token="$(/usr/local/bin/agent-token github)"; then
+  export GH_TOKEN="$token"
+fi
+exec /usr/bin/gh "$@"

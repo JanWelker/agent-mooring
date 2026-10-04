@@ -39,11 +39,11 @@ RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}" \
 RUN ARCH="$(dpkg --print-architecture)" \
  && curl -fsSLo kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \
  && curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar -xzO "linux-${ARCH}/helm" > helm \
- && curl -fsSLo argocd "https://github.com/argoproj/argo-cd/releases/download/v${ARGOCD_VERSION}/argocd-linux-${ARCH}" \
+ && curl -fsSLo /argocd "https://github.com/argoproj/argo-cd/releases/download/v${ARGOCD_VERSION}/argocd-linux-${ARCH}" \
  && curl -fsSL "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-${ARCH}.tar.gz" | tar -xz cilium \
  && curl -fsSL "https://github.com/cilium/hubble/releases/download/v${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz" | tar -xz hubble \
  && curl -fsSL "https://github.com/openbao/openbao/releases/download/v${OPENBAO_VERSION}/openbao_${OPENBAO_VERSION}_linux_${ARCH}.tar.gz" | tar -xz bao \
- && chmod 0755 /out/*
+ && chmod 0755 /out/* /argocd
 
 FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 
@@ -85,6 +85,8 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && npm cache clean --force
 
 COPY --from=tools /out/ /usr/local/bin/
+# /usr/local/bin/argocd and gh are wrappers that read the current token.
+COPY --from=tools /argocd /usr/local/libexec/argocd
 COPY rootfs/ /
 
 # claude-agent-acp runs /usr/local/bin/claude (CLAUDE_CODE_EXECUTABLE below), so

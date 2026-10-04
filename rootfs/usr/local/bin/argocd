@@ -1,0 +1,6 @@
+#!/bin/bash
+# argocd with the current Argo CD token; see agent-token.
+if token="$(/usr/local/bin/agent-token argocd)"; then
+  export ARGOCD_AUTH_TOKEN="$token"
+fi
+exec /usr/local/libexec/argocd "$@"

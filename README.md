@@ -39,7 +39,7 @@ every start and is idempotent:
 
 1. Generates SSH host keys once under `~/.ssh/host`.
 2. Copies `authorized_keys` from `/etc/claude-agent/authorized_keys`.
-3. With `GH_TOKEN`: `gh auth setup-git`, the git identity from the token's
+3. With a GitHub token: git's credential helper set to `gh`, the git identity from the token's
    user, and a one-time clone of each of `AGENT_REPOS` (space-separated) into `~/<name>`;
    existing clones are never pulled or reset, the agent owns them. A failed
    clone is logged and skipped.
@@ -108,8 +108,16 @@ value. Secrets come from the store, without the `kv/` prefix:
 
 | Secret | Key | When |
 | --- | --- | --- |
-| `claude-<session>-github` → `GH_TOKEN` | `claude-<session>/github`, property `token`; one PAT for all repositories | `repos`, `repo` or `skills.repo` set |
-| `claude-<session>-argocd` → `ARGOCD_AUTH_TOKEN` | `claude-agents/argocd`, property `token` | `argocd.enabled` |
+| `claude-<session>-github` → `github-token` | `claude-<session>/github`, property `token`; one PAT for all repositories | `repos`, `repo` or `skills.repo` set |
+| `claude-<session>-argocd` → `argocd-token` | `claude-agents/argocd`, property `token` | `argocd.enabled` |
+
+The tokens are files under `/var/run/secrets/claude-agent`, not environment
+variables. `gh`, git's credential helper and `argocd` are wrappers that read
+them on every call, so a rotated token takes effect without a restart: once
+the ExternalSecret refreshes (hourly, or at once with
+`kubectl -n claude-agents annotate externalsecret claude-<session>-github force-sync=$(date +%s) --overwrite`),
+the kubelet updates the file within a minute or two. A login shell also
+exports `GH_TOKEN` and `ARGOCD_AUTH_TOKEN` as of its start, for other tools.
 
 ### Managed settings
 
