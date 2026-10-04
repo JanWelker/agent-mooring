@@ -30,6 +30,41 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        # Native sidecar: TLS from the Gateway's passthrough listener ends
+        # here and goes on to sshd on loopback.
+        - name: tls
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          restartPolicy: Always
+          command: ["/usr/bin/tini", "--", "/usr/local/bin/tls-proxy"]
+          ports:
+            - name: ssh
+              containerPort: 2222
+              protocol: TCP
+          # Only at start: every TCP probe is a failed TLS handshake in the log.
+          startupProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 2
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
       containers:
         - name: agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -62,23 +97,23 @@ spec:
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          ports:
-            - name: ssh
-              containerPort: 2222
-              protocol: TCP
+          # sshd listens on 127.0.0.1:2223 only, out of reach of the kubelet's
+          # TCP probes; the probes connect from inside the container.
           startupProbe:
-            tcpSocket:
-              port: ssh
+            exec:
+              command: ["bash", "-c", "</dev/tcp/127.0.0.1/2223"]
             periodSeconds: 5
             failureThreshold: 60
           livenessProbe:
-            tcpSocket:
-              port: ssh
+            exec:
+              command: ["bash", "-c", "</dev/tcp/127.0.0.1/2223"]
             periodSeconds: 20
+            timeoutSeconds: 5
           readinessProbe:
-            tcpSocket:
-              port: ssh
+            exec:
+              command: ["bash", "-c", "</dev/tcp/127.0.0.1/2223"]
             periodSeconds: 10
+            timeoutSeconds: 5
           lifecycle:
             preStop:
               exec:
@@ -111,6 +146,9 @@ spec:
         - name: home
           persistentVolumeClaim:
             claimName: {{ include "claude-agent.claimName" . }}
+        - name: tls
+          secret:
+            secretName: {{ $name }}-tls
         - name: tmp
           emptyDir:
             sizeLimit: 4Gi

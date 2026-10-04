@@ -5,6 +5,11 @@ as a long-running agent on Kubernetes. One release is one session: a pod with
 Claude Code in tmux, reachable over SSH through a Gateway API `TLSRoute` and
 from claude.ai/code through Remote Control.
 
+```text
+ssh -> openssl s_client -> :443 Gateway (TLS passthrough, SNI <session>.ssh.wlkr.ch)
+    -> Service :2222 -> tls sidecar (socat, cert-manager certificate) -> sshd 127.0.0.1:2223
+```
+
 | Artifact | Reference |
 | --- | --- |
 | Image | `ghcr.io/janwelker/claude-agent:<claude-code-version>` (amd64, arm64) |
@@ -22,7 +27,7 @@ Debian trixie, uid/gid 1000 (`agent`), home `/home/agent`. Works with
 | Contents | |
 | --- | --- |
 | Claude Code | native binary, `/usr/local/bin/claude`, auto-updater off |
-| Shell | openssh-server, tmux, git, gh, jq, ripgrep, rsync, python3, vim-tiny, less |
+| Shell | openssh-server, socat, tmux, git, gh, jq, ripgrep, rsync, python3, vim-tiny, less |
 | Node.js | `node`, `npm`, `npx` for MCP servers; `claude-agent-acp`, also as `claude-code-acp` |
 | Cluster | kubectl, helm, argocd, cilium, hubble, bao |
 
@@ -38,10 +43,16 @@ every start and is idempotent:
    source, since sshd does not pass it on.
 6. Starts tmux session `main` with
    `claude --remote-control claude-<session> --continue`.
-7. Execs `sshd -D` on port 2222 with a config generated in `/tmp/agent`.
+7. Execs `sshd -D` on `127.0.0.1:2223` with a config generated in `/tmp/agent`.
 
 An SSH login without a command attaches `main`; a login with a command runs it,
 so `scp`, `rsync`, `sftp` and ACP work.
+
+The chart runs the same image a second time as a native sidecar,
+[`tls-proxy`](rootfs/usr/local/bin/tls-proxy): socat terminates TLS on :2222
+with the session's certificate and forwards to sshd. socat reads the
+certificate only at start, so `tls-proxy` restarts the listener within a
+minute of a renewal; open connections keep running.
 
 ## Chart values
 
@@ -58,6 +69,7 @@ so `scp`, `rsync`, `sftp` and ACP work.
 | `ssh.authorizedKeys` | `[]` | Public key lines |
 | `ssh.gateway` | `apps-gateway`/`kube-system`/`ssh` | `TLSRoute` parent: name, namespace, sectionName |
 | `ssh.domain` | `ssh.wlkr.ch` | |
+| `tls.issuerRef` | `letsencrypt-prod`, `ClusterIssuer` | Issuer of the `claude-<session>-tls` certificate the sidecar serves |
 | `acp.enabled` | `false` | Opens npm registry egress for ACP clients |
 | `mcpServers` | `{}` | User-scope MCP servers, `.mcp.json` format |
 | `extraEgressFQDNs` | `[]` | `[{matchName: host, port: 443}]` or `[{matchPattern: "*.host"}]` |
@@ -106,8 +118,8 @@ The `CiliumNetworkPolicy` lets port 2222 in from the `ingress`, `host` and
 
 ## SSH
 
-The Gateway terminates TLS for `*.ssh.wlkr.ch` and forwards plain TCP to sshd,
-so the client wraps SSH in TLS. Add this to `~/.ssh/config`:
+The Gateway passes TLS for `*.ssh.wlkr.ch` through by SNI and the pod
+terminates it, so the client wraps SSH in TLS. Add this to `~/.ssh/config`:
 
 ```text
 Host *.ssh.wlkr.ch
@@ -147,9 +159,10 @@ Zed runs the agent over SSH. In `settings.json`:
 
 ```bash
 container build -t claude-agent:dev .        # or docker build
-container run --rm --read-only --tmpfs /tmp --tmpfs /home/agent claude-agent:dev check
+container run --rm --read-only --tmpfs /tmp --tmpfs /home/agent claude-agent:dev check   # sshd -t
 helm lint chart/claude-agent -f chart/claude-agent/ci/full-values.yaml
 ```
 
 CI runs hadolint, `helm lint`, `helm template` through kubeconform, and an image
-smoke test that logs in over SSH.
+smoke test that logs in over SSH through the TLS sidecar with a self-signed
+certificate.

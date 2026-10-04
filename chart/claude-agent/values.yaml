@@ -29,6 +29,13 @@ ssh:
     sectionName: ssh
   domain: ssh.wlkr.ch
 
+tls:
+  # -- Issuer of the per-session certificate the TLS sidecar serves; the
+  # Gateway passes TLS through, so the pod terminates it.
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+
 acp:
   # -- Allow npm registry egress for ACP clients; claude-code-acp itself is in the image.
   enabled: false

@@ -11,5 +11,5 @@ spec:
   ports:
     - name: ssh
       port: 2222
-      targetPort: ssh
+      targetPort: 2222
       protocol: TCP

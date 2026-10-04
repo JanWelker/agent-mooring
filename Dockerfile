@@ -67,7 +67,7 @@ RUN apt-get update \
       > /etc/apt/sources.list.d/github-cli.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
-      gh git jq less openssh-client openssh-server procps python3 ripgrep rsync tini tmux vim-tiny \
+      gh git jq less openssh-client openssh-server procps python3 ripgrep rsync socat tini tmux vim-tiny \
  && apt-get purge -y gnupg && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/* /etc/ssh/ssh_host_* \
  && install -d -m 0755 /run/sshd \
@@ -99,6 +99,6 @@ ENV HOME=/home/agent \
 
 USER 1000:1000
 WORKDIR /home/agent
-EXPOSE 2222
+EXPOSE 2223
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

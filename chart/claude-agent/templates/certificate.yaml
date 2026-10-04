@@ -1,0 +1,20 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "claude-agent.fullname" . }}-tls
+  labels:
+    {{- include "claude-agent.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  secretName: {{ include "claude-agent.fullname" . }}-tls
+  dnsNames:
+    - {{ printf "%s.%s" .Values.session .Values.ssh.domain }}
+  issuerRef:
+    group: cert-manager.io
+    kind: {{ .Values.tls.issuerRef.kind }}
+    name: {{ .Values.tls.issuerRef.name }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always

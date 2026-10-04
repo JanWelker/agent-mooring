@@ -9,7 +9,9 @@ set -euo pipefail
 : "${HOME:=/home/agent}"
 SESSION="${AGENT_SESSION:-agent}"
 REPO="${AGENT_REPO:-}"
-SSHD_PORT="${SSHD_PORT:-2222}"
+# Loopback only: the TLS sidecar on :2222 is the way in.
+SSHD_PORT="${SSHD_PORT:-2223}"
+SSHD_LISTEN="${SSHD_LISTEN:-127.0.0.1}"
 AUTHORIZED_KEYS_SRC="${AGENT_AUTHORIZED_KEYS:-/etc/claude-agent/authorized_keys}"
 MCP_SRC="${AGENT_MCP_CONFIG:-/etc/claude-agent/mcp.json}"
 RUNTIME_DIR=/tmp/agent
@@ -48,6 +50,7 @@ export -p \
   | sed 's/^declare -x /export /' > "$RUNTIME_DIR/env"
 
 cat > "$SSHD_CONFIG" <<CONF
+ListenAddress $SSHD_LISTEN
 Port $SSHD_PORT
 HostKey $HOST_KEY_DIR/ssh_host_ed25519_key
 HostKey $HOST_KEY_DIR/ssh_host_ecdsa_key
