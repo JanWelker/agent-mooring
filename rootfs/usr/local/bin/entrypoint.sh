@@ -44,6 +44,12 @@ else
   : > "$HOME/.ssh/authorized_keys"
 fi
 
+# fsGroup leaves /tmp and $HOME shared-writable without the sticky bit, which
+# Claude refuses for its messaging sockets. /dev/shm is a sticky tmpfs.
+if [ -z "${XDG_RUNTIME_DIR:-}" ] && mkdir -p /dev/shm/agent 2>/dev/null; then
+  export XDG_RUNTIME_DIR=/dev/shm/agent
+fi
+
 # sshd and every login get the container env through this file, so tokens
 # stay on the emptyDir and never land on the PVC.
 export -p \
