@@ -1,10 +1,10 @@
 #!/bin/bash
 # The command in the tmux pane "main": Claude Code with Remote Control,
 # restarted whenever it exits, so the session never silently drops out of
-# the Claude apps. Ctrl-C during the pause, or the file ~/.claude-agent-hold,
+# the Claude apps. Ctrl-C during the pause, or the file ~/.agent-mooring-hold,
 # leaves a shell in the pane instead.
 name="claude-${AGENT_SESSION:-agent}"
-hold="$HOME/.claude-agent-hold"
+hold="$HOME/.agent-mooring-hold"
 delay=5
 
 trap 'echo; exec bash -l' INT

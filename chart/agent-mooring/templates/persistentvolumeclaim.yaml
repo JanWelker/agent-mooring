@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "claude-agent.fullname" . }}
+  name: {{ include "agent-mooring.fullname" . }}
   labels:
-    {{- include "claude-agent.labels" . | nindent 4 }}
+    {{- include "agent-mooring.labels" . | nindent 4 }}
   annotations:
     # The home directory holds the conversation, the clone and the host keys.
     argocd.argoproj.io/sync-options: Prune=false

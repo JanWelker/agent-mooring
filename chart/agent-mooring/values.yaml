@@ -20,7 +20,7 @@ skills:
   ref: main
 
 image:
-  repository: ghcr.io/janwelker/claude-agent
+  repository: ghcr.io/janwelker/agent-mooring
   # -- Defaults to the chart's appVersion, the Claude Code version.
   tag: ""
   # -- Image manifest digest (sha256:...), appended to the tag. The release

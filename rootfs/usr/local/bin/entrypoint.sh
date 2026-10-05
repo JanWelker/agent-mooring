@@ -13,9 +13,9 @@ REPOS="${AGENT_REPOS:-${AGENT_REPO:-}}"
 # Loopback only: the TLS sidecar on :2222 is the way in.
 SSHD_PORT="${SSHD_PORT:-2223}"
 SSHD_LISTEN="${SSHD_LISTEN:-127.0.0.1}"
-AUTHORIZED_KEYS_SRC="${AGENT_AUTHORIZED_KEYS:-/etc/claude-agent/authorized_keys}"
-MCP_SRC="${AGENT_MCP_CONFIG:-/etc/claude-agent/mcp.json}"
-APPA_POLICY_SRC="${AGENT_APPA_POLICY:-/etc/claude-agent/appa.toml}"
+AUTHORIZED_KEYS_SRC="${AGENT_AUTHORIZED_KEYS:-/etc/agent-mooring/authorized_keys}"
+MCP_SRC="${AGENT_MCP_CONFIG:-/etc/agent-mooring/mcp.json}"
+APPA_POLICY_SRC="${AGENT_APPA_POLICY:-/etc/agent-mooring/appa.toml}"
 RUNTIME_DIR=/tmp/agent
 HOST_KEY_DIR="$HOME/.ssh/host"
 SSHD_CONFIG="$RUNTIME_DIR/sshd_config"

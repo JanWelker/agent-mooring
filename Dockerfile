@@ -93,7 +93,7 @@ ARG CLAUDE_CODE_VERSION
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
 ARG CLAUDE_AGENT_ACP_VERSION=0.85.1
 
-LABEL org.opencontainers.image.source="https://github.com/JanWelker/claude-agent" \
+LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-mooring" \
       org.opencontainers.image.description="Claude Code as a long-running agent behind sshd and tmux" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${CLAUDE_CODE_VERSION}"

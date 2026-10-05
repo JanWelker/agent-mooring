@@ -1,8 +1,8 @@
 {{- $host := printf "%s.%s" .Values.session .Values.ssh.domain -}}
-Claude agent {{ include "claude-agent.fullname" . }} (Claude Code {{ .Values.image.tag | default .Chart.AppVersion }}).
+Claude agent {{ include "agent-mooring.fullname" . }} (Claude Code {{ .Values.image.tag | default .Chart.AppVersion }}).
 
 1. Add this once to ~/.ssh/config. The Gateway passes TLS through; the pod's
-   tls sidecar terminates it with Secret {{ include "claude-agent.tlsSecretName" . }}.
+   tls sidecar terminates it with Secret {{ include "agent-mooring.tlsSecretName" . }}.
 
    Host *.{{ .Values.ssh.domain }}
      User agent
@@ -14,14 +14,14 @@ Claude agent {{ include "claude-agent.fullname" . }} (Claude Code {{ .Values.ima
 
 3. First run only: in the Claude pane, run /login (or `claude auth login` in a
    shell), then /config -> "Enable Remote Control for all sessions".
-   The session then shows up at claude.ai/code as {{ include "claude-agent.fullname" . }}.
+   The session then shows up at claude.ai/code as {{ include "agent-mooring.fullname" . }}.
 
 ACP from Zed: agent command `ssh {{ $host }} claude-code-acp`.
-{{- $repos := include "claude-agent.repos" . }}
+{{- $repos := include "agent-mooring.repos" . }}
 {{- $skills := .Values.skills.repo }}
 {{- if or $repos $skills }}
 
-The PAT for {{ join ", " (compact (list $repos $skills)) }} (one token covering all of them) is read from OpenBao kv/{{ include "claude-agent.fullname" . }}/github (property token).
+The PAT for {{ join ", " (compact (list $repos $skills)) }} (one token covering all of them) is read from OpenBao kv/{{ include "agent-mooring.fullname" . }}/github (property token).
 {{- end }}
 {{- if $skills }}
 

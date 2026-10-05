@@ -1,9 +1,9 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
 metadata:
-  name: {{ include "claude-agent.fullname" . }}
+  name: {{ include "agent-mooring.fullname" . }}
   labels:
-    {{- include "claude-agent.labels" . | nindent 4 }}
+    {{- include "agent-mooring.labels" . | nindent 4 }}
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
@@ -15,5 +15,5 @@ spec:
     - {{ printf "%s.%s" .Values.session .Values.ssh.domain }}
   rules:
     - backendRefs:
-        - name: {{ include "claude-agent.fullname" . }}
+        - name: {{ include "agent-mooring.fullname" . }}
           port: 2222
