@@ -1,62 +1,62 @@
-{{- define "claude-agent.fullname" -}}
+{{- define "agent-mooring.fullname" -}}
 claude-{{ required "session is required" .Values.session }}
 {{- end -}}
 
 {{/* Effective repository list, space-separated: repos plus the deprecated repo, deduplicated. Empty string when none. */}}
-{{- define "claude-agent.repos" -}}
+{{- define "agent-mooring.repos" -}}
 {{- $l := .Values.repos | default list -}}
 {{- if .Values.repo -}}{{- $l = append $l .Values.repo -}}{{- end -}}
 {{- join " " (uniq $l) -}}
 {{- end -}}
 
 {{/* "true" when the session needs the GitHub token and egress: any repository or the skills repository. Empty otherwise. */}}
-{{- define "claude-agent.github" -}}
-{{- if or (include "claude-agent.repos" .) .Values.skills.repo -}}true{{- end -}}
+{{- define "agent-mooring.github" -}}
+{{- if or (include "agent-mooring.repos" .) .Values.skills.repo -}}true{{- end -}}
 {{- end -}}
 
 {{/* "true" when any token Secret is mounted. */}}
-{{- define "claude-agent.tokens" -}}
-{{- if or (include "claude-agent.github" .) .Values.argocd.enabled -}}true{{- end -}}
+{{- define "agent-mooring.tokens" -}}
+{{- if or (include "agent-mooring.github" .) .Values.argocd.enabled -}}true{{- end -}}
 {{- end -}}
 
 {{/* repository:tag, with @digest when image.digest is set. */}}
-{{- define "claude-agent.image" -}}
+{{- define "agent-mooring.image" -}}
 {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}{{ if .Values.image.digest }}@{{ .Values.image.digest }}{{ end }}
 {{- end -}}
 
-{{- define "claude-agent.selectorLabels" -}}
-app.kubernetes.io/name: claude-agent
-app.kubernetes.io/instance: {{ include "claude-agent.fullname" . }}
+{{- define "agent-mooring.selectorLabels" -}}
+app.kubernetes.io/name: agent-mooring
+app.kubernetes.io/instance: {{ include "agent-mooring.fullname" . }}
 {{- end -}}
 
-{{- define "claude-agent.labels" -}}
-{{ include "claude-agent.selectorLabels" . }}
+{{- define "agent-mooring.labels" -}}
+{{ include "agent-mooring.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- end -}}
 
-{{- define "claude-agent.serviceAccountName" -}}
+{{- define "agent-mooring.serviceAccountName" -}}
 {{- if eq .Values.kubernetes.access "read" -}}
 claude-reader
 {{- else if eq .Values.kubernetes.access "write" -}}
 claude-writer
 {{- else -}}
-{{ include "claude-agent.fullname" . }}
+{{ include "agent-mooring.fullname" . }}
 {{- end -}}
 {{- end -}}
 
 {{/* The Secret the TLS sidecar serves: tls.existingSecret or the chart's Certificate. */}}
-{{- define "claude-agent.tlsSecretName" -}}
-{{- .Values.tls.existingSecret | default (printf "%s-tls" (include "claude-agent.fullname" .)) -}}
+{{- define "agent-mooring.tlsSecretName" -}}
+{{- .Values.tls.existingSecret | default (printf "%s-tls" (include "agent-mooring.fullname" .)) -}}
 {{- end -}}
 
-{{- define "claude-agent.claimName" -}}
-{{- .Values.persistence.existingClaim | default (include "claude-agent.fullname" .) -}}
+{{- define "agent-mooring.claimName" -}}
+{{- .Values.persistence.existingClaim | default (include "agent-mooring.fullname" .) -}}
 {{- end -}}
 
 {{/* The chart's managed settings, with .Values.settings merged over them. */}}
-{{- define "claude-agent.managedSettings" -}}
+{{- define "agent-mooring.managedSettings" -}}
 {{- $defaults := dict
   "env" (dict "DISABLE_AUTOUPDATER" "1")
   "remoteControlAtStartup" true
@@ -80,7 +80,7 @@ claude-writer
 {{- mergeOverwrite $defaults (deepCopy .Values.settings) | toPrettyJson -}}
 {{- end -}}
 
-{{- define "claude-agent.https" -}}
+{{- define "agent-mooring.https" -}}
 toPorts:
   - ports:
       - port: "443"

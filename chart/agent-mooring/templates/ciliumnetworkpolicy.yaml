@@ -1,16 +1,16 @@
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: {{ include "claude-agent.fullname" . }}
+  name: {{ include "agent-mooring.fullname" . }}
   labels:
-    {{- include "claude-agent.labels" . | nindent 4 }}
+    {{- include "agent-mooring.labels" . | nindent 4 }}
 spec:
   description: >-
     SSH from the Gateway and the node's probes in; out, only Claude Code's
     own hosts plus what the session's toggles add.
   endpointSelector:
     matchLabels:
-      {{- include "claude-agent.selectorLabels" . | nindent 6 }}
+      {{- include "agent-mooring.selectorLabels" . | nindent 6 }}
   ingress:
     - fromEntities:
         - ingress
@@ -46,20 +46,20 @@ spec:
         - matchPattern: "*.frame.claudeusercontent.com"
         - matchName: http-intake.logs.us5.datadoghq.com
         - matchName: browser-intake-us5-datadoghq.com
-      {{- include "claude-agent.https" . | nindent 6 }}
-    {{- if or (include "claude-agent.github" .) .Values.appa.enabled }}
+      {{- include "agent-mooring.https" . | nindent 6 }}
+    {{- if or (include "agent-mooring.github" .) .Values.appa.enabled }}
     - toFQDNs:
         - matchName: github.com
         - matchName: api.github.com
         - matchPattern: "*.githubusercontent.com"
         - matchName: ghcr.io
         - matchName: pkg-containers.githubusercontent.com
-      {{- include "claude-agent.https" . | nindent 6 }}
+      {{- include "agent-mooring.https" . | nindent 6 }}
     {{- end }}
     {{- if or .Values.acp.enabled .Values.mcpServers }}
     - toFQDNs:
         - matchName: registry.npmjs.org
-      {{- include "claude-agent.https" . | nindent 6 }}
+      {{- include "agent-mooring.https" . | nindent 6 }}
     {{- end }}
     {{- if ne .Values.kubernetes.access "none" }}
     - toEntities:
@@ -74,7 +74,7 @@ spec:
     {{- if .Values.argocd.enabled }}
     - toFQDNs:
         - matchName: {{ .Values.argocd.server }}
-      {{- include "claude-agent.https" . | nindent 6 }}
+      {{- include "agent-mooring.https" . | nindent 6 }}
     {{- end }}
     {{- range .Values.extraEgressFQDNs }}
     - toFQDNs:

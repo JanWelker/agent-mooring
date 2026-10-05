@@ -1,13 +1,13 @@
 apiVersion: v2
-name: claude-agent
+name: agent-mooring
 description: A long-running Claude Code agent, reachable over SSH through a Gateway TLSRoute and over Remote Control
 type: application
-version: 0.4.0
+version: 0.5.0
 # The Claude Code version, and the default image tag. Set by the release workflow.
 appVersion: "2.1.289"
-home: https://github.com/JanWelker/claude-agent
+home: https://github.com/JanWelker/agent-mooring
 sources:
-  - https://github.com/JanWelker/claude-agent
+  - https://github.com/JanWelker/agent-mooring
 keywords:
   - claude-code
   - agent

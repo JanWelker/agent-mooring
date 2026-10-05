@@ -3,6 +3,6 @@
 # Fails, printing nothing, when there is none. The kubelet refreshes the
 # files when the ExternalSecret changes, so every call sees the current
 # token and a rotation needs no restart.
-f="${AGENT_TOKEN_DIR:-/var/run/secrets/claude-agent}/${1:?usage: agent-token github|argocd}-token"
+f="${AGENT_TOKEN_DIR:-/var/run/secrets/agent-mooring}/${1:?usage: agent-token github|argocd}-token"
 [ -s "$f" ] || exit 1
 tr -d '[:space:]' < "$f"

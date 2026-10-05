@@ -2,13 +2,13 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "claude-agent.fullname" . }}-tls
+  name: {{ include "agent-mooring.fullname" . }}-tls
   labels:
-    {{- include "claude-agent.labels" . | nindent 4 }}
+    {{- include "agent-mooring.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  secretName: {{ include "claude-agent.fullname" . }}-tls
+  secretName: {{ include "agent-mooring.fullname" . }}-tls
   dnsNames:
     - {{ printf "%s.%s" .Values.session .Values.ssh.domain }}
   issuerRef:

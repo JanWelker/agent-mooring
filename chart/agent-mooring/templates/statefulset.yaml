@@ -1,24 +1,24 @@
-{{- $name := include "claude-agent.fullname" . }}
+{{- $name := include "agent-mooring.fullname" . }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "claude-agent.labels" . | nindent 4 }}
+    {{- include "agent-mooring.labels" . | nindent 4 }}
 spec:
   replicas: 1
   serviceName: {{ $name }}
   selector:
     matchLabels:
-      {{- include "claude-agent.selectorLabels" . | nindent 6 }}
+      {{- include "agent-mooring.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "claude-agent.labels" . | nindent 8 }}
+        {{- include "agent-mooring.labels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
-      serviceAccountName: {{ include "claude-agent.serviceAccountName" . }}
+      serviceAccountName: {{ include "agent-mooring.serviceAccountName" . }}
       automountServiceAccountToken: {{ ne .Values.kubernetes.access "none" }}
       enableServiceLinks: false
       terminationGracePeriodSeconds: 60
@@ -34,7 +34,7 @@ spec:
         # Native sidecar: TLS from the Gateway's passthrough listener ends
         # here and goes on to sshd on loopback.
         - name: tls
-          image: {{ include "claude-agent.image" . | quote }}
+          image: {{ include "agent-mooring.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           restartPolicy: Always
           command: ["/usr/bin/tini", "--", "/usr/local/bin/tls-proxy"]
@@ -67,13 +67,13 @@ spec:
               readOnly: true
       containers:
         - name: agent
-          image: {{ include "claude-agent.image" . | quote }}
+          image: {{ include "agent-mooring.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: AGENT_SESSION
               value: {{ .Values.session | quote }}
             - name: AGENT_REPOS
-              value: {{ include "claude-agent.repos" . | quote }}
+              value: {{ include "agent-mooring.repos" . | quote }}
             - name: AGENT_KUBERNETES_ACCESS
               value: {{ .Values.kubernetes.access | quote }}
             - name: AGENT_SKILLS_REPO
@@ -137,22 +137,22 @@ spec:
               mountPath: /etc/claude-code
               readOnly: true
             - name: agent-config
-              mountPath: /etc/claude-agent
+              mountPath: /etc/agent-mooring
               readOnly: true
-            {{- if include "claude-agent.tokens" . }}
+            {{- if include "agent-mooring.tokens" . }}
             # Files, not env: the kubelet updates them when the ExternalSecret
             # refreshes, and the gh, git and argocd wrappers read them per call.
             - name: tokens
-              mountPath: /var/run/secrets/claude-agent
+              mountPath: /var/run/secrets/agent-mooring
               readOnly: true
             {{- end }}
       volumes:
         - name: home
           persistentVolumeClaim:
-            claimName: {{ include "claude-agent.claimName" . }}
+            claimName: {{ include "agent-mooring.claimName" . }}
         - name: tls
           secret:
-            secretName: {{ include "claude-agent.tlsSecretName" . }}
+            secretName: {{ include "agent-mooring.tlsSecretName" . }}
         - name: tmp
           emptyDir:
             sizeLimit: 4Gi
@@ -178,12 +178,12 @@ spec:
               - key: appa.toml
                 path: appa.toml
               {{- end }}
-        {{- if include "claude-agent.tokens" . }}
+        {{- if include "agent-mooring.tokens" . }}
         - name: tokens
           projected:
             defaultMode: 0440
             sources:
-              {{- if include "claude-agent.github" . }}
+              {{- if include "agent-mooring.github" . }}
               - secret:
                   name: {{ $name }}-github
                   items:

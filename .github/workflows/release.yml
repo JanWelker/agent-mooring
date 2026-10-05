@@ -35,7 +35,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/janwelker/claude-agent
+  IMAGE: ghcr.io/janwelker/agent-mooring
   CHART_REGISTRY: oci://ghcr.io/janwelker/charts
   # renovate: datasource=github-releases depName=helm/helm
   HELM_VERSION: v4.3.0
@@ -171,7 +171,7 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          base="$(yq '.version' chart/claude-agent/Chart.yaml)"
+          base="$(yq '.version' chart/agent-mooring/Chart.yaml)"
           minor="${base%.*}"
           last="$(git tag --list "chart-${minor}.*" --sort=-v:refname | head -n1)"
           if [ -n "$last" ]; then
@@ -179,20 +179,20 @@ jobs:
           else
             chart_version="$base"
           fi
-          yq -i ".version = \"${chart_version}\" | .appVersion = \"${TAG}\"" chart/claude-agent/Chart.yaml
+          yq -i ".version = \"${chart_version}\" | .appVersion = \"${TAG}\"" chart/agent-mooring/Chart.yaml
           # Pin the packaged chart to the image just pushed, so the digest,
           # not the tag, decides what runs.
-          yq -i ".image.digest = \"${DIGEST}\"" chart/claude-agent/values.yaml
-          helm package chart/claude-agent -d dist
+          yq -i ".image.digest = \"${DIGEST}\"" chart/agent-mooring/values.yaml
+          helm package chart/agent-mooring -d dist
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-          helm push "dist/claude-agent-${chart_version}.tgz" "$CHART_REGISTRY" 2>&1 | tee push.txt
+          helm push "dist/agent-mooring-${chart_version}.tgz" "$CHART_REGISTRY" 2>&1 | tee push.txt
           chart_digest="$(awk '/^Digest:/ {print $2}' push.txt)"
           if [[ ! "$chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "no chart digest in the helm push output" >&2
             exit 1
           fi
-          cosign sign --yes "${CHART_REGISTRY#oci://}/claude-agent@${chart_digest}"
-          git checkout -- chart/claude-agent/Chart.yaml chart/claude-agent/values.yaml
+          cosign sign --yes "${CHART_REGISTRY#oci://}/agent-mooring@${chart_digest}"
+          git checkout -- chart/agent-mooring/Chart.yaml chart/agent-mooring/values.yaml
           echo "version=${chart_version}" >> "$GITHUB_OUTPUT"
 
       - name: Tag and release
@@ -216,7 +216,7 @@ jobs:
             echo "| --- | --- |"
             echo "| Image | \`${IMAGE}:${TAG}\` |"
             echo "| Image digest | \`${IMAGE}@${DIGEST}\` |"
-            echo "| Chart | \`${CHART_REGISTRY}/claude-agent\` version \`${CHART_VERSION}\` |"
+            echo "| Chart | \`${CHART_REGISTRY}/agent-mooring\` version \`${CHART_VERSION}\` |"
             echo
             echo "Both are signed with cosign by this workflow; see the README for \`cosign verify\`."
             echo

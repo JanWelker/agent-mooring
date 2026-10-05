@@ -43,14 +43,14 @@ jobs:
             | sudo tar -xz -C /usr/local/bin kubeconform
       - name: helm lint
         run: |
-          for f in chart/claude-agent/ci/*-values.yaml; do
-            helm lint --strict chart/claude-agent -f "$f"
+          for f in chart/agent-mooring/ci/*-values.yaml; do
+            helm lint --strict chart/agent-mooring -f "$f"
           done
       - name: helm template | kubeconform
         run: |
-          for f in chart/claude-agent/ci/*-values.yaml; do
+          for f in chart/agent-mooring/ci/*-values.yaml; do
             echo "::group::$f"
-            helm template claude chart/claude-agent -n claude-agents -f "$f" \
+            helm template claude chart/agent-mooring -n claude-agents -f "$f" \
               | kubeconform -strict -summary \
                   -schema-location default \
                   -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/${{ env.CRDS_CATALOG_REF }}/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
@@ -58,7 +58,7 @@ jobs:
           done
       - name: Schema rejects bad values
         run: |
-          if helm template claude chart/claude-agent --set session=Bad_Name >/dev/null 2>&1; then
+          if helm template claude chart/agent-mooring --set session=Bad_Name >/dev/null 2>&1; then
             echo "an invalid session name rendered" >&2
             exit 1
           fi
@@ -76,29 +76,29 @@ jobs:
         with:
           context: .
           load: true
-          tags: claude-agent:ci
+          tags: agent-mooring:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Tools run
         run: |
-          docker run --rm --entrypoint claude claude-agent:ci --version
-          docker run --rm --entrypoint kubectl claude-agent:ci version --client
-          docker run --rm --entrypoint argocd claude-agent:ci version --client
+          docker run --rm --entrypoint claude agent-mooring:ci --version
+          docker run --rm --entrypoint kubectl agent-mooring:ci version --client
+          docker run --rm --entrypoint argocd agent-mooring:ci version --client
           for t in helm argocd cilium hubble bao appa gh node socat claude-code-acp; do
-            docker run --rm --entrypoint bash claude-agent:ci -c "command -v $t"
+            docker run --rm --entrypoint bash agent-mooring:ci -c "command -v $t"
           done
       - name: sshd -t with the generated config, read-only root
         run: |
           docker run --rm --read-only --user 1000:1000 \
             --tmpfs /tmp --tmpfs /home/agent:uid=1000,gid=1000 \
-            claude-agent:ci check
+            agent-mooring:ci check
       - name: Managed settings from the chart are valid
         run: |
           mkdir -p managed
-          helm template claude chart/claude-agent -f chart/claude-agent/ci/full-values.yaml \
+          helm template claude chart/agent-mooring -f chart/agent-mooring/ci/full-values.yaml \
             -s templates/configmap.yaml | yq '.data["managed-settings.json"]' > managed/managed-settings.json
           out="$(docker run --rm --tmpfs /home/agent:uid=1000,gid=1000 \
-            -v "$PWD/managed:/etc/claude-code:ro" --entrypoint claude claude-agent:ci doctor 2>&1 || true)"
+            -v "$PWD/managed:/etc/claude-code:ro" --entrypoint claude agent-mooring:ci doctor 2>&1 || true)"
           echo "$out"
           if grep -q "Invalid settings" <<<"$out"; then exit 1; fi
       - name: Start, ssh in through the TLS sidecar, find the tmux session
@@ -112,9 +112,9 @@ jobs:
           mkdir -p tokens && echo ci-token-1 > tokens/github-token
           docker run -d --name agent --read-only --user 1000:1000 \
             --tmpfs /tmp --tmpfs /home/agent:uid=1000,gid=1000 \
-            -v "$PWD/keys:/etc/claude-agent:ro" -v "$PWD/tls:/tls:ro" -e AGENT_SESSION=ci \
-            -v "$PWD/tokens:/var/run/secrets/claude-agent:ro" \
-            -p 2222:2222 claude-agent:ci
+            -v "$PWD/keys:/etc/agent-mooring:ro" -v "$PWD/tls:/tls:ro" -e AGENT_SESSION=ci \
+            -v "$PWD/tokens:/var/run/secrets/agent-mooring:ro" \
+            -p 2222:2222 agent-mooring:ci
           docker exec -d agent /usr/local/bin/tls-proxy
           # docker-proxy accepts on the host before anything listens inside.
           for _ in $(seq 60); do

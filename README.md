@@ -1,4 +1,11 @@
-# claude-agent
+# agent-mooring
+
+> A mooring keeps a boat where you left it. This one is for coding agents.
+
+Laptops sleep, terminals close, and the agent that was halfway through a
+refactor goes down with them. Tie it up in your cluster instead: it stays
+afloat through restarts, keeps its conversation, and is still there in the
+morning, wherever you row out to it from. No knots required.
 
 A container image and Helm chart that run [Claude Code](https://code.claude.com)
 as a long-running agent on Kubernetes. One release is one session: a pod with
@@ -12,8 +19,8 @@ ssh -> openssl s_client -> :443 Gateway (TLS passthrough, SNI <session>.ssh.wlkr
 
 | Artifact | Reference |
 | --- | --- |
-| Image | `ghcr.io/janwelker/claude-agent:<claude-code-version>[-<build>]` (amd64, arm64) |
-| Chart | `oci://ghcr.io/janwelker/charts/claude-agent` |
+| Image | `ghcr.io/janwelker/agent-mooring:<claude-code-version>[-<build>]` (amd64, arm64) |
+| Chart | `oci://ghcr.io/janwelker/charts/agent-mooring` |
 
 A release workflow checks npm every hour. Each new Claude Code version gets an
 image tagged with that version and a chart whose `appVersion` is that version,
@@ -27,9 +34,9 @@ findings are listed in the release notes. The image carries SLSA provenance and
 an SBOM, and image and chart are signed with cosign, keyless:
 
 ```bash
-cosign verify ghcr.io/janwelker/claude-agent:<tag> \
+cosign verify ghcr.io/janwelker/agent-mooring:<tag> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/JanWelker/claude-agent/\.github/workflows/release\.yml@'
+  --certificate-identity-regexp '^https://github.com/JanWelker/agent-mooring/\.github/workflows/release\.yml@'
 ```
 
 ## Image
@@ -58,7 +65,7 @@ The entrypoint ([`entrypoint.sh`](rootfs/usr/local/bin/entrypoint.sh)) runs on
 every start and is idempotent:
 
 1. Generates SSH host keys once under `~/.ssh/host`.
-2. Copies `authorized_keys` from `/etc/claude-agent/authorized_keys`.
+2. Copies `authorized_keys` from `/etc/agent-mooring/authorized_keys`.
 3. With a GitHub token: git's credential helper set to `gh`, the git identity from the token's
    user, and a one-time clone of each of `AGENT_REPOS` (space-separated) into `~/<name>`;
    existing clones are never pulled or reset, the agent owns them. A failed
@@ -68,7 +75,7 @@ every start and is idempotent:
    deleted), or fast-forwards an existing checkout; a pull that cannot
    fast-forward is logged and left alone. Network steps run under `timeout`,
    so sshd always starts.
-4. Merges `/etc/claude-agent/mcp.json` into `~/.claude.json`, removing servers
+4. Merges `/etc/agent-mooring/mcp.json` into `~/.claude.json`, removing servers
    the chart set before and no longer lists (tracked in
    `~/.claude/agent-mcp-servers.json`). Marks `$HOME` and each cloned
    repository trusted there, so Claude does not ask on every start; Claude
@@ -111,7 +118,7 @@ minute of a renewal; open connections keep running.
 | `skills.ref` | `main` | Branch cloned. A changed value is checked out on the next start, unless the checkout has local changes |
 | `repo` | `""` | Deprecated alias: appended to `repos`, duplicates dropped |
 | `image.digest` | `""` | `sha256:...` manifest digest appended to the tag. The release workflow sets it in the published chart, so a re-pushed tag is pulled again despite `IfNotPresent` |
-| `image.repository` | `ghcr.io/janwelker/claude-agent` | |
+| `image.repository` | `ghcr.io/janwelker/agent-mooring` | |
 | `image.tag` | `""` | Empty: the chart's `appVersion` |
 | `image.pullPolicy` | `IfNotPresent` | |
 | `kubernetes.access` | `none` | `none`: own ServiceAccount, no token. `read`/`write`: `claude-reader`/`claude-writer` with a token |
@@ -137,7 +144,7 @@ minute of a renewal; open connections keep running.
 | `extraEnv` | `[]` | Extra container env |
 | `nodeSelector`, `tolerations`, `affinity` | empty | |
 
-[`values.schema.json`](chart/claude-agent/values.schema.json) validates every
+[`values.schema.json`](chart/agent-mooring/values.schema.json) validates every
 value. Secrets come from the store, without the `kv/` prefix:
 
 | Secret | Key | When |
@@ -145,7 +152,7 @@ value. Secrets come from the store, without the `kv/` prefix:
 | `claude-<session>-github` → `github-token` | `claude-<session>/github`, property `token`; one PAT for all repositories | `repos`, `repo` or `skills.repo` set |
 | `claude-<session>-argocd` → `argocd-token` | `claude-agents/argocd`, property `token` | `argocd.enabled` |
 
-The tokens are files under `/var/run/secrets/claude-agent`, not environment
+The tokens are files under `/var/run/secrets/agent-mooring`, not environment
 variables. `gh`, git's credential helper and `argocd` are wrappers that read
 them on every call, so a rotated token takes effect without a restart: once
 the ExternalSecret refreshes (hourly, or at once with
@@ -155,7 +162,7 @@ exports `GH_TOKEN` and `ARGOCD_AUTH_TOKEN` as of its start, for other tools.
 
 ### Managed settings
 
-The chart's [defaults](chart/claude-agent/templates/_helpers.tpl) turn on
+The chart's [defaults](chart/agent-mooring/templates/_helpers.tpl) turn on
 Remote Control for every session, drop commit and PR attribution, allow
 read-only `kubectl`, `gh pr checks` and `argocd app get`, deny
 `gh pr merge --admin`, pushes to `main` and force pushes, and run a
@@ -193,7 +200,7 @@ Host *.ssh.wlkr.ch
 Then `ssh <session>.ssh.wlkr.ch` attaches the tmux session. Detach with
 `C-b d`; Claude keeps running. After `/exit` Claude comes back within seconds;
 press Ctrl-C during the pause for a shell in the pane instead, or
-`touch ~/.claude-agent-hold` to stop restarts until the file is removed and
+`touch ~/.agent-mooring-hold` to stop restarts until the file is removed and
 `agent-claude` is run again.
 
 ## First run
@@ -221,14 +228,42 @@ Zed runs the agent over SSH. In `settings.json`:
 }
 ```
 
+## Upgrading from claude-agent
+
+The project was called `claude-agent` up to chart 0.4. Chart 0.5.0 is the same
+chart under the new name:
+
+| | Before | From 0.5.0 |
+| --- | --- | --- |
+| Image | `ghcr.io/janwelker/claude-agent` | `ghcr.io/janwelker/agent-mooring` |
+| Chart | `oci://ghcr.io/janwelker/charts/claude-agent` | `oci://ghcr.io/janwelker/charts/agent-mooring` |
+| Label | `app.kubernetes.io/name: claude-agent` | `app.kubernetes.io/name: agent-mooring` |
+| Hold file | `~/.claude-agent-hold` | `~/.agent-mooring-hold` |
+
+Resource names (`claude-<session>`), the PVC and the secret paths are
+unchanged, so login, clones and conversation carry over. The label is part of
+the StatefulSet's selector, which Kubernetes does not let a release change:
+delete the StatefulSet once and let the new chart create it again. The PVC is
+a separate object and is kept.
+
+```bash
+kubectl -n <namespace> delete statefulset claude-<session>
+```
+
 ## Development
 
 ```bash
-container build -t claude-agent:dev .        # or docker build
-container run --rm --read-only --tmpfs /tmp --tmpfs /home/agent claude-agent:dev check   # sshd -t
-helm lint chart/claude-agent -f chart/claude-agent/ci/full-values.yaml
+container build -t agent-mooring:dev .        # or docker build
+container run --rm --read-only --tmpfs /tmp --tmpfs /home/agent agent-mooring:dev check   # sshd -t
+helm lint chart/agent-mooring -f chart/agent-mooring/ci/full-values.yaml
 ```
 
 CI runs hadolint, `helm lint`, `helm template` through kubeconform, and an image
 smoke test that logs in over SSH through the TLS sidecar with a self-signed
 certificate.
+
+## Trademarks
+
+An independent project, not affiliated with or endorsed by Anthropic. Claude
+and Claude Code are trademarks of Anthropic, PBC, named here only to say what
+the image runs.
