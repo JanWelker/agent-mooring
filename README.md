@@ -14,24 +14,26 @@ from claude.ai/code through Remote Control.
 
 ```text
 ssh -> openssl s_client -> :443 Gateway (TLS passthrough, SNI <session>.ssh.wlkr.ch)
-    -> Service :2222 -> tls sidecar (socat, cert-manager certificate) -> sshd 127.0.0.1:2223
+    -> Service :2222 -> tls sidecar (tls-proxy, cert-manager certificate) -> sshd 127.0.0.1:2223
 ```
 
 | Artifact | Reference |
 | --- | --- |
 | Image | `ghcr.io/janwelker/agent-mooring:<claude-code-version>[-<build>]` (amd64, arm64) |
+| TLS sidecar | `ghcr.io/janwelker/agent-mooring-tls-proxy:<same tag>` (amd64, arm64) |
 | Chart | `oci://ghcr.io/janwelker/charts/agent-mooring` |
 
 A release workflow checks npm every hour. Each new Claude Code version gets an
 image tagged with that version and a chart whose `appVersion` is that version,
 so an instance only ever bumps the chart version. A change to `Dockerfile`,
-`rootfs/` or `chart/` merged to `main` is released at once as a new build of
-the current version, `<version>-2`, `-3` and so on; no tag is ever pushed twice.
+`rootfs/`, `cmd/` or `chart/` merged to `main` is released at once as a new
+build of the current version, `<version>-2`, `-3` and so on; no tag is ever
+pushed twice.
 
-The image is pushed by digest and tagged only after a smoke test and a Trivy
+The images are pushed by digest and tagged only after a smoke test and a Trivy
 scan that fails on any fixable CRITICAL finding; fixable HIGH and CRITICAL
-findings are listed in the release notes. The image carries SLSA provenance and
-an SBOM, and image and chart are signed with cosign, keyless:
+findings are listed in the release notes. Both images carry SLSA provenance and
+an SBOM, and images and chart are signed with cosign, keyless:
 
 ```bash
 cosign verify ghcr.io/janwelker/agent-mooring:<tag> \
@@ -50,7 +52,7 @@ shared-writable without the sticky bit.
 | Contents | |
 | --- | --- |
 | Claude Code | native binary, `/usr/local/bin/claude`, auto-updater off |
-| Shell | openssh-server, socat, tmux, git, gh, jq, ripgrep, rsync, python3, less |
+| Shell | openssh-server, tmux, git, gh, jq, ripgrep, rsync, python3, less |
 | Node.js | `node`, `npm`, `npx` for MCP servers; `claude-agent-acp`, also as `claude-code-acp` |
 | Cluster | kubectl, helm, argocd, cilium, bao |
 | Guardrails | [`appa`](https://github.com/archestra-ai/OpenAPPA), the OpenAPPA CLI |
@@ -102,11 +104,12 @@ every start and is idempotent:
 An SSH login without a command attaches `main`; a login with a command runs it,
 so `scp`, `rsync`, `sftp` and ACP work.
 
-The chart runs the same image a second time as a native sidecar,
-[`tls-proxy`](rootfs/usr/local/bin/tls-proxy): socat terminates TLS on :2222
-with the session's certificate and forwards to sshd. socat reads the
-certificate only at start, so `tls-proxy` restarts the listener within a
-minute of a renewal; open connections keep running.
+The chart runs [`tls-proxy`](cmd/tls-proxy/main.go) as a native sidecar from
+its own image, a static Go binary on distroless `static`, so the one container
+reachable from outside the pod carries no shell and no packages. It terminates
+TLS on :2222 with the session's certificate and forwards to sshd. It re-reads
+the certificate every minute, so a renewal reaches the next handshake; open
+connections keep running.
 
 ## Chart values
 
@@ -129,6 +132,7 @@ minute of a renewal; open connections keep running.
 | `ssh.domain` | `ssh.wlkr.ch` | |
 | `tls.existingSecret` | `""` | A `kubernetes.io/tls` Secret in the namespace to serve instead of a per-session certificate, for example one `*.<ssh.domain>` wildcard for all sessions; no `Certificate` is created, and the session name stays out of certificate transparency logs |
 | `tls.issuerRef` | `letsencrypt-prod`, `ClusterIssuer` | Issuer of the `claude-<session>-tls` certificate the sidecar serves when `tls.existingSecret` is empty |
+| `tls.image.*` | `ghcr.io/janwelker/agent-mooring-tls-proxy`, tag and digest as `image.*` | The TLS sidecar image |
 | `acp.enabled` | `false` | Opens npm registry egress for ACP clients |
 | `appa.enabled` | `false` | Protects the main session with [OpenAPPA](https://openappa.com): installs its Claude Code plugin on start and runs Claude under `clappa`. Only that session is gated; ACP and `claude` started by hand are not. Run `/appa-guide` in it once to tune the policy |
 | `appa.policy` | `""` | Root OpenAPPA policy (`appa.toml`). When set, it replaces `~/.config/appa/appa.toml` on start if it loads, keeping the old file as `appa.toml.bak`; one that does not load leaves the current policy. Changing it restarts the pod. Empty leaves the policy on the PVC |
