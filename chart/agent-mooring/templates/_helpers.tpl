@@ -24,6 +24,12 @@ claude-{{ required "session is required" .Values.session }}
 {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}{{ if .Values.image.digest }}@{{ .Values.image.digest }}{{ end }}
 {{- end -}}
 
+{{- define "agent-mooring.tlsImage" -}}
+{{- with .Values.tls.image -}}
+{{ .repository }}:{{ .tag | default $.Chart.AppVersion }}{{ if .digest }}@{{ .digest }}{{ end }}
+{{- end -}}
+{{- end -}}
+
 {{- define "agent-mooring.selectorLabels" -}}
 app.kubernetes.io/name: agent-mooring
 app.kubernetes.io/instance: {{ include "agent-mooring.fullname" . }}

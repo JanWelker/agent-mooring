@@ -79,6 +79,27 @@ RUN ARCH="$(dpkg --print-architecture)" \
  && chmod 0755 /out/* \
  && rm -rf /dl/*
 
+FROM --platform=$BUILDPLATFORM golang:1.27.1-trixie@sha256:8f58fd67ea075142d947a60e0caa4317746a55118d312f027793d382c7741734 AS tls-proxy-build
+
+ARG TARGETOS TARGETARCH
+WORKDIR /src
+COPY go.mod ./
+COPY cmd/ cmd/
+RUN CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" \
+    go build -trimpath -ldflags='-s -w' -o /out/tls-proxy ./cmd/tls-proxy
+
+# The chart's TLS sidecar, built with --target tls-proxy: one static binary,
+# no shell, so it carries none of the agent image's packages.
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3 AS tls-proxy
+
+LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-mooring" \
+      org.opencontainers.image.description="TLS sidecar of agent-mooring: terminates TLS and forwards to sshd" \
+      org.opencontainers.image.licenses="MIT"
+
+COPY --from=tls-proxy-build /out/tls-proxy /tls-proxy
+EXPOSE 2222
+ENTRYPOINT ["/tls-proxy"]
+
 FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -103,7 +124,7 @@ RUN apt-get update \
       > /etc/apt/sources.list.d/github-cli.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
-      gh git jq less openssh-client openssh-server procps python3 ripgrep rsync socat \
+      gh git jq less openssh-client openssh-server procps python3 ripgrep rsync \
       systemd-standalone-sysusers tini tmux \
  && apt-get purge -y gnupg && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/* /etc/ssh/ssh_host_* \

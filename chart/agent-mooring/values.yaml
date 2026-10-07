@@ -56,6 +56,14 @@ tls:
   issuerRef:
     name: letsencrypt-prod
     kind: ClusterIssuer
+  # -- The TLS sidecar image, a distroless build of cmd/tls-proxy.
+  image:
+    repository: ghcr.io/janwelker/agent-mooring-tls-proxy
+    # -- Defaults to the chart's appVersion, like image.tag.
+    tag: ""
+    # -- Set by the release workflow in the packaged chart, like image.digest.
+    digest: ""
+    pullPolicy: IfNotPresent
 
 acp:
   # -- Allow npm registry egress for ACP clients; claude-code-acp itself is in the image.

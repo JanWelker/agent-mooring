@@ -1,10 +1,10 @@
 ---
-# Builds the image and chart for every Claude Code release, and again for
+# Builds the images and chart for every Claude Code release, and again for
 # every change to the image or chart on main. The image tag is the Claude
 # Code version, with -<n> from the second build of that version on; the
 # chart's appVersion follows it, and the chart's patch version moves by one
 # per publish. Nothing is tagged before the smoke test and the Trivy gate
-# pass; image and chart are signed with cosign.
+# pass; images and chart are signed with cosign.
 name: Release
 
 "on":
@@ -14,6 +14,8 @@ name: Release
     branches: [main]
     paths:
       - Dockerfile
+      - go.mod
+      - cmd/**
       - rootfs/**
       - chart/**
   workflow_dispatch:
@@ -36,6 +38,7 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/janwelker/agent-mooring
+  TLS_IMAGE: ghcr.io/janwelker/agent-mooring-tls-proxy
   CHART_REGISTRY: oci://ghcr.io/janwelker/charts
   # renovate: datasource=github-releases depName=helm/helm
   HELM_VERSION: v4.3.0
@@ -124,6 +127,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build and push the TLS sidecar image
+        id: build-tls
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: tls-proxy
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,name=${{ env.TLS_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          labels: org.opencontainers.image.version=${{ env.TAG }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=tls-proxy
+          cache-to: type=gha,scope=tls-proxy,mode=max
+
       - name: Smoke test the pushed image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -143,6 +160,15 @@ jobs:
           exit-code: "1"
           format: table
 
+      - name: Trivy gate, fixable CRITICAL, TLS sidecar
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.TLS_IMAGE }}@${{ steps.build-tls.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
       - name: Trivy report, fixable HIGH and CRITICAL
         continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -154,22 +180,28 @@ jobs:
           format: table
           output: trivy.txt
 
-      - name: Tag and sign the image
+      - name: Tag and sign the images
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          TLS_DIGEST: ${{ steps.build-tls.outputs.digest }}
         run: |
-          docker buildx imagetools create -t "${IMAGE}:${TAG}" "${IMAGE}@${DIGEST}"
-          tagged="$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{json .Manifest}}' | jq -r .digest)"
-          if [ "$tagged" != "$DIGEST" ]; then
-            echo "${IMAGE}:${TAG} is ${tagged}, expected ${DIGEST}" >&2
-            exit 1
-          fi
-          cosign sign --yes "${IMAGE}@${DIGEST}"
+          tag_and_sign() {
+            docker buildx imagetools create -t "$1:${TAG}" "$1@$2"
+            tagged="$(docker buildx imagetools inspect "$1:${TAG}" --format '{{json .Manifest}}' | jq -r .digest)"
+            if [ "$tagged" != "$2" ]; then
+              echo "$1:${TAG} is ${tagged}, expected $2" >&2
+              exit 1
+            fi
+            cosign sign --yes "$1@$2"
+          }
+          tag_and_sign "$IMAGE" "$DIGEST"
+          tag_and_sign "$TLS_IMAGE" "$TLS_DIGEST"
 
       - name: Package and push the chart
         id: chart
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          TLS_DIGEST: ${{ steps.build-tls.outputs.digest }}
         run: |
           base="$(yq '.version' chart/agent-mooring/Chart.yaml)"
           minor="${base%.*}"
@@ -180,9 +212,9 @@ jobs:
             chart_version="$base"
           fi
           yq -i ".version = \"${chart_version}\" | .appVersion = \"${TAG}\"" chart/agent-mooring/Chart.yaml
-          # Pin the packaged chart to the image just pushed, so the digest,
+          # Pin the packaged chart to the images just pushed, so the digest,
           # not the tag, decides what runs.
-          yq -i ".image.digest = \"${DIGEST}\"" chart/agent-mooring/values.yaml
+          yq -i ".image.digest = \"${DIGEST}\" | .tls.image.digest = \"${TLS_DIGEST}\"" chart/agent-mooring/values.yaml
           helm package chart/agent-mooring -d dist
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm push "dist/agent-mooring-${chart_version}.tgz" "$CHART_REGISTRY" 2>&1 | tee push.txt
@@ -199,6 +231,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          TLS_DIGEST: ${{ steps.build-tls.outputs.digest }}
           CHART_VERSION: ${{ steps.chart.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
@@ -216,9 +249,10 @@ jobs:
             echo "| --- | --- |"
             echo "| Image | \`${IMAGE}:${TAG}\` |"
             echo "| Image digest | \`${IMAGE}@${DIGEST}\` |"
+            echo "| TLS sidecar | \`${TLS_IMAGE}@${TLS_DIGEST}\` |"
             echo "| Chart | \`${CHART_REGISTRY}/agent-mooring\` version \`${CHART_VERSION}\` |"
             echo
-            echo "Both are signed with cosign by this workflow; see the README for \`cosign verify\`."
+            echo "All are signed with cosign by this workflow; see the README for \`cosign verify\`."
             echo
             echo "Changes in Claude Code: https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md"
             if [ -s trivy.txt ]; then

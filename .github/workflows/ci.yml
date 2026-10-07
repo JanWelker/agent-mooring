@@ -30,6 +30,18 @@ jobs:
         with:
           dockerfile: Dockerfile
 
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -d .; exit 1; }
+      - run: go vet ./...
+      - run: go test -race ./...
+
   chart:
     runs-on: ubuntu-latest
     steps:
@@ -79,12 +91,21 @@ jobs:
           tags: agent-mooring:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Build the TLS sidecar
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: tls-proxy
+          load: true
+          tags: agent-mooring-tls-proxy:ci
+          cache-from: type=gha,scope=tls-proxy
+          cache-to: type=gha,scope=tls-proxy,mode=max
       - name: Tools run
         run: |
           docker run --rm --entrypoint claude agent-mooring:ci --version
           docker run --rm --entrypoint kubectl agent-mooring:ci version --client
           docker run --rm --entrypoint argocd agent-mooring:ci version --client
-          for t in helm argocd cilium bao appa gh node socat claude-code-acp; do
+          for t in helm argocd cilium bao appa gh node claude-code-acp; do
             docker run --rm --entrypoint bash agent-mooring:ci -c "command -v $t"
           done
       - name: sshd -t with the generated config, read-only root
@@ -115,7 +136,9 @@ jobs:
             -v "$PWD/keys:/etc/agent-mooring:ro" -v "$PWD/tls:/tls:ro" -e AGENT_SESSION=ci \
             -v "$PWD/tokens:/var/run/secrets/agent-mooring:ro" \
             -p 2222:2222 agent-mooring:ci
-          docker exec -d agent /usr/local/bin/tls-proxy
+          # As in the pod: the sidecar shares the agent's network namespace.
+          docker run -d --name tls --network container:agent --read-only --user 1000:1000 \
+            -v "$PWD/tls:/tls:ro" agent-mooring-tls-proxy:ci
           # docker-proxy accepts on the host before anything listens inside.
           for _ in $(seq 60); do
             docker exec agent bash -c '</dev/tcp/127.0.0.1/2223 && </dev/tcp/127.0.0.1/2222' 2>/dev/null && break
@@ -137,4 +160,6 @@ jobs:
           [ "$(cat out.txt)" = "$(printf 'password=ci-token-2\nci-token-2')" ]
       - name: Container logs
         if: always()
-        run: docker logs agent || true
+        run: |
+          docker logs agent || true
+          docker logs tls || true
