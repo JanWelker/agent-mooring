@@ -26,8 +26,6 @@ ARG HELM_VERSION=4.3.0
 ARG ARGOCD_VERSION=3.5.3
 # renovate: datasource=github-releases depName=cilium/cilium-cli extractVersion=^v(?<version>.*)$
 ARG CILIUM_CLI_VERSION=0.20.1
-# renovate: datasource=github-releases depName=cilium/hubble extractVersion=^v(?<version>.*)$
-ARG HUBBLE_VERSION=1.19.4
 # renovate: datasource=github-releases depName=openbao/openbao extractVersion=^v(?<version>.*)$
 ARG OPENBAO_VERSION=2.7.1
 # renovate: datasource=github-releases depName=archestra-ai/OpenAPPA extractVersion=^v(?<version>.*)$
@@ -66,9 +64,6 @@ RUN ARCH="$(dpkg --print-architecture)" \
  && curl -fsSLO "$gh/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-${ARCH}.tar.gz" \
       -O "$gh/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-${ARCH}.tar.gz.sha256sum" \
  && sha256sum -c --quiet "cilium-linux-${ARCH}.tar.gz.sha256sum" \
- && curl -fsSLO "$gh/cilium/hubble/releases/download/v${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz" \
-      -O "$gh/cilium/hubble/releases/download/v${HUBBLE_VERSION}/hubble-linux-${ARCH}.tar.gz.sha256sum" \
- && sha256sum -c --quiet "hubble-linux-${ARCH}.tar.gz.sha256sum" \
  && curl -fsSLO "$gh/openbao/openbao/releases/download/v${OPENBAO_VERSION}/openbao_${OPENBAO_VERSION}_linux_${ARCH}.tar.gz" \
       -O "$gh/openbao/openbao/releases/download/v${OPENBAO_VERSION}/checksums.txt" \
  && grep -E "  openbao_${OPENBAO_VERSION}_linux_${ARCH}\.tar\.gz$" checksums.txt | sha256sum -c --quiet - \
@@ -79,7 +74,6 @@ RUN ARCH="$(dpkg --print-architecture)" \
  && tar -xzO -f "helm-v${HELM_VERSION}-linux-${ARCH}.tar.gz" "linux-${ARCH}/helm" > /out/helm \
  && install -m 0755 "argocd-linux-${ARCH}" /argocd \
  && tar -xz -C /out -f "cilium-linux-${ARCH}.tar.gz" cilium \
- && tar -xz -C /out -f "hubble-linux-${ARCH}.tar.gz" hubble \
  && tar -xz -C /out -f "openbao_${OPENBAO_VERSION}_linux_${ARCH}.tar.gz" bao \
  && tar -xz -C /out -f "appa-${RUST_ARCH}-unknown-linux-gnu.tar.gz" ./appa \
  && chmod 0755 /out/* \
@@ -98,6 +92,8 @@ LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-moorin
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${CLAUDE_CODE_VERSION}"
 
+# openssh-server needs only sysusers out of systemd, so the standalone package
+# stands in for it.
 # hadolint ignore=DL3008
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
@@ -107,7 +103,8 @@ RUN apt-get update \
       > /etc/apt/sources.list.d/github-cli.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
-      gh git jq less openssh-client openssh-server procps python3 ripgrep rsync socat tini tmux vim-tiny \
+      gh git jq less openssh-client openssh-server procps python3 ripgrep rsync socat \
+      systemd-standalone-sysusers tini tmux \
  && apt-get purge -y gnupg && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/* /etc/ssh/ssh_host_* \
  && install -d -m 0755 /run/sshd \
