@@ -50,9 +50,9 @@ shared-writable without the sticky bit.
 | Contents | |
 | --- | --- |
 | Claude Code | native binary, `/usr/local/bin/claude`, auto-updater off |
-| Shell | openssh-server, socat, tmux, git, gh, jq, ripgrep, rsync, python3, vim-tiny, less |
+| Shell | openssh-server, socat, tmux, git, gh, jq, ripgrep, rsync, python3, less |
 | Node.js | `node`, `npm`, `npx` for MCP servers; `claude-agent-acp`, also as `claude-code-acp` |
-| Cluster | kubectl, helm, argocd, cilium, hubble, bao |
+| Cluster | kubectl, helm, argocd, cilium, bao |
 | Guardrails | [`appa`](https://github.com/archestra-ai/OpenAPPA), the OpenAPPA CLI |
 
 The build verifies every download: Claude Code against its release manifest,
