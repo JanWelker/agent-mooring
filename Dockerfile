@@ -85,7 +85,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ARG CLAUDE_CODE_VERSION
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
-ARG CLAUDE_AGENT_ACP_VERSION=0.86.0
+ARG CLAUDE_AGENT_ACP_VERSION=0.87.0
 
 LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-mooring" \
       org.opencontainers.image.description="Claude Code as a long-running agent behind sshd and tmux" \
