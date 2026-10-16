@@ -7,7 +7,7 @@ ARG CLAUDE_CODE_VERSION=2.1.289
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43 AS tools
 
 # hadolint ignore=DL3018
-RUN apk add --no-cache bash coreutils curl gnupg jq tar
+RUN apk add --no-cache bash coreutils curl gpg gpg-agent jq
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
