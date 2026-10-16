@@ -41,7 +41,7 @@ cosign verify ghcr.io/janwelker/agent-mooring:<tag> \
 
 ## Image
 
-Debian trixie, uid/gid 1000 (`agent`), home `/home/agent`. Works with
+[Wolfi](https://github.com/wolfi-dev), uid/gid 1000 (`agent`), home `/home/agent`. Works with
 `readOnlyRootFilesystem`; the writable paths are `$HOME` and `/tmp`, plus
 `/dev/shm/agent` as `XDG_RUNTIME_DIR`: Claude Code refuses to put its
 cross-session messaging sockets under a directory that `fsGroup` made

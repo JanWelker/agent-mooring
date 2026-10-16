@@ -81,7 +81,7 @@ PrintMotd no
 ClientAliveInterval 30
 ClientAliveCountMax 4
 AcceptEnv LANG LC_* COLORTERM
-Subsystem sftp /usr/lib/openssh/sftp-server
+Subsystem sftp /usr/lib/ssh/sftp-server
 ForceCommand /usr/local/bin/agent-shell
 CONF
 

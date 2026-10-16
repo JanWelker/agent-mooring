@@ -3,16 +3,13 @@
 # The release workflow passes the version it builds; this default is for local builds.
 ARG CLAUDE_CODE_VERSION=2.1.289
 
-FROM node:24.21.0-trixie-slim@sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66 AS node
+# Wolfi publishes only `latest`; the digest is the pin and Renovate moves it.
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43 AS tools
 
-FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS tools
+# hadolint ignore=DL3018
+RUN apk add --no-cache bash coreutils curl gpg gpg-agent jq
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-# hadolint ignore=DL3008
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl gnupg jq \
- && rm -rf /var/lib/apt/lists/*
 
 ARG CLAUDE_CODE_VERSION
 # Anthropic's Claude Code release signing key, from
@@ -35,7 +32,7 @@ ARG APPA_VERSION=0.32.0
 # from the pinned key: GnuPG's VALIDSIG line ends in the primary key's
 # fingerprint.
 WORKDIR /dl
-RUN case "$(dpkg --print-architecture)" in amd64) p=linux-x64 ;; arm64) p=linux-arm64 ;; esac \
+RUN case "$(uname -m)" in x86_64) p=linux-x64 ;; aarch64) p=linux-arm64 ;; esac \
  && base="https://downloads.claude.ai/claude-code-releases/${CLAUDE_CODE_VERSION}" \
  && GNUPGHOME="$(mktemp -d)" && export GNUPGHOME \
  && curl -fsSL https://downloads.claude.ai/keys/claude-code.asc | gpg --batch -q --import \
@@ -49,8 +46,8 @@ RUN case "$(dpkg --print-architecture)" in amd64) p=linux-x64 ;; arm64) p=linux-
  && rm -rf /dl/* "$GNUPGHOME"
 
 # Each download is checked against the checksum file its project publishes.
-RUN ARCH="$(dpkg --print-architecture)" \
- && case "$ARCH" in amd64) RUST_ARCH=x86_64 ;; arm64) RUST_ARCH=aarch64 ;; esac \
+RUN RUST_ARCH="$(uname -m)" \
+ && case "$RUST_ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 ;; esac \
  && gh="https://github.com" \
  && k8s="https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \
  && curl -fsSLO "$k8s" \
@@ -79,9 +76,7 @@ RUN ARCH="$(dpkg --print-architecture)" \
  && chmod 0755 /out/* \
  && rm -rf /dl/*
 
-FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
-
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43
 
 ARG CLAUDE_CODE_VERSION
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
@@ -92,31 +87,22 @@ LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-moorin
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${CLAUDE_CODE_VERSION}"
 
-# openssh-server needs only sysusers out of systemd, so the standalone package
-# stands in for it.
-# hadolint ignore=DL3008
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
- && install -d -m 0755 /etc/apt/keyrings \
- && curl -fsSLo /etc/apt/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg \
- && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-      > /etc/apt/sources.list.d/github-cli.list \
- && apt-get update \
- && apt-get install -y --no-install-recommends \
-      gh git jq less openssh-client openssh-server procps python3 ripgrep rsync socat \
-      systemd-standalone-sysusers tini tmux \
- && apt-get purge -y gnupg && apt-get autoremove -y \
- && rm -rf /var/lib/apt/lists/* /etc/ssh/ssh_host_* \
+# The package names carry the Node.js and Python majors; everything else
+# follows Wolfi at build time.
+# hadolint ignore=DL3018
+RUN apk add --no-cache \
+      bash ca-certificates-bundle curl gh git jq less nodejs-24 npm \
+      openssh-client openssh-keygen openssh-server openssh-sftp-server procps \
+      python-3.14 ripgrep rsync shadow socat tini tmux \
+ && rm -f /etc/ssh/ssh_host_* \
  && install -d -m 0755 /run/sshd \
  && groupadd -g 1000 agent \
  && useradd -u 1000 -g 1000 -m -d /home/agent -s /bin/bash agent \
  && usermod -p '*' agent
 
-COPY --from=node /usr/local/bin/node /usr/local/bin/node
-COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
- && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
- && npm install -g --omit=dev "@agentclientprotocol/claude-agent-acp@${CLAUDE_AGENT_ACP_VERSION}" \
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN npm install -g --prefix /usr/local --omit=dev "@agentclientprotocol/claude-agent-acp@${CLAUDE_AGENT_ACP_VERSION}" \
  && rm -rf /usr/local/lib/node_modules/@agentclientprotocol/claude-agent-acp/node_modules/@anthropic-ai/claude-agent-sdk-linux-* \
  && ln -s claude-agent-acp /usr/local/bin/claude-code-acp \
  && npm cache clean --force
