@@ -80,7 +80,7 @@ FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be
 
 ARG CLAUDE_CODE_VERSION
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
-ARG CLAUDE_AGENT_ACP_VERSION=0.91.0
+ARG CLAUDE_AGENT_ACP_VERSION=0.93.0
 
 LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-mooring" \
       org.opencontainers.image.description="Claude Code as a long-running agent behind sshd and tmux" \
