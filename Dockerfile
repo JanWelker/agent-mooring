@@ -26,7 +26,7 @@ ARG CILIUM_CLI_VERSION=0.20.1
 # renovate: datasource=github-releases depName=openbao/openbao extractVersion=^v(?<version>.*)$
 ARG OPENBAO_VERSION=2.7.1
 # renovate: datasource=github-releases depName=archestra-ai/OpenAPPA extractVersion=^v(?<version>.*)$
-ARG APPA_VERSION=0.35.0
+ARG APPA_VERSION=0.35.1
 
 # The release binary, checked against the manifest whose signature must come
 # from the pinned key: GnuPG's VALIDSIG line ends in the primary key's
