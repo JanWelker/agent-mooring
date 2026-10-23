@@ -20,7 +20,7 @@ ARG KUBECTL_VERSION=1.37.1
 # renovate: datasource=github-releases depName=helm/helm extractVersion=^v(?<version>.*)$
 ARG HELM_VERSION=4.3.1
 # renovate: datasource=github-releases depName=argoproj/argo-cd extractVersion=^v(?<version>.*)$
-ARG ARGOCD_VERSION=3.5.5
+ARG ARGOCD_VERSION=3.5.6
 # renovate: datasource=github-releases depName=cilium/cilium-cli extractVersion=^v(?<version>.*)$
 ARG CILIUM_CLI_VERSION=0.20.1
 # renovate: datasource=github-releases depName=openbao/openbao extractVersion=^v(?<version>.*)$
