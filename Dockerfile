@@ -79,8 +79,6 @@ RUN RUST_ARCH="$(uname -m)" \
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43
 
 ARG CLAUDE_CODE_VERSION
-# renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
-ARG CLAUDE_AGENT_ACP_VERSION=0.95.0
 
 LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-mooring" \
       org.opencontainers.image.description="Claude Code as a long-running agent behind sshd and tmux" \
@@ -102,8 +100,15 @@ RUN apk add --no-cache \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-RUN npm install -g --prefix /usr/local --omit=dev "@agentclientprotocol/claude-agent-acp@${CLAUDE_AGENT_ACP_VERSION}" \
- && rm -rf /usr/local/lib/node_modules/@agentclientprotocol/claude-agent-acp/node_modules/@anthropic-ai/claude-agent-sdk-linux-* \
+# claude-agent-acp and every transitive package come from acp/package-lock.json,
+# so the hourly rebuilds install the same tree; Renovate bumps both files.
+# npm ci runs in the directory: with --prefix it does not match the lockfile.
+WORKDIR /usr/local/lib/claude-agent-acp
+COPY acp/package.json acp/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts \
+ && rm -rf node_modules/@anthropic-ai/claude-agent-sdk-linux-* \
+ && install -d -m 0755 /usr/local/bin \
+ && ln -s ../lib/claude-agent-acp/node_modules/.bin/claude-agent-acp /usr/local/bin/claude-agent-acp \
  && ln -s claude-agent-acp /usr/local/bin/claude-code-acp \
  && npm cache clean --force
 

@@ -15,6 +15,7 @@ name: Release
     paths:
       - Dockerfile
       - rootfs/**
+      - acp/**
       - chart/**
   workflow_dispatch:
     inputs:
@@ -170,6 +171,8 @@ jobs:
         id: chart
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
         run: |
           base="$(yq '.version' chart/agent-mooring/Chart.yaml)"
           minor="${base%.*}"
@@ -184,7 +187,7 @@ jobs:
           # not the tag, decides what runs.
           yq -i ".image.digest = \"${DIGEST}\"" chart/agent-mooring/values.yaml
           helm package chart/agent-mooring -d dist
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          echo "$REGISTRY_TOKEN" | helm registry login ghcr.io -u "$ACTOR" --password-stdin
           helm push "dist/agent-mooring-${chart_version}.tgz" "$CHART_REGISTRY" 2>&1 | tee push.txt
           chart_digest="$(awk '/^Digest:/ {print $2}' push.txt)"
           if [[ ! "$chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
