@@ -38,9 +38,12 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
       - name: Install kubeconform
+        working-directory: ${{ runner.temp }}
         run: |
-          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
-            | sudo tar -xz -C /usr/local/bin kubeconform
+          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
+          curl -fsSLO "$base/kubeconform-linux-amd64.tar.gz" -O "$base/CHECKSUMS"
+          grep -E "  kubeconform-linux-amd64\.tar\.gz$" CHECKSUMS | sha256sum -c --strict -
+          sudo tar -xz -C /usr/local/bin -f kubeconform-linux-amd64.tar.gz kubeconform
       - name: helm lint
         run: |
           for f in chart/agent-mooring/ci/*-values.yaml; do

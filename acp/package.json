@@ -1,0 +1,9 @@
+{
+  "name": "agent-mooring-acp",
+  "private": true,
+  "description": "claude-agent-acp for the image, installed with npm ci so its transitive dependencies are locked.",
+  "license": "MIT",
+  "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "0.95.0"
+  }
+}
