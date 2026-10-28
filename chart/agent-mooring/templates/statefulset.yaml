@@ -34,10 +34,9 @@ spec:
         # Native sidecar: TLS from the Gateway's passthrough listener ends
         # here and goes on to sshd on loopback.
         - name: tls
-          image: {{ include "agent-mooring.image" . | quote }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "agent-mooring.tlsImage" . | quote }}
+          imagePullPolicy: {{ .Values.tls.image.pullPolicy }}
           restartPolicy: Always
-          command: ["/usr/bin/tini", "--", "/usr/local/bin/tls-proxy"]
           ports:
             - name: ssh
               containerPort: 2222
