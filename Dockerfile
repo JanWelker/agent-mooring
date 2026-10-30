@@ -6,6 +6,10 @@ ARG CLAUDE_CODE_VERSION=2.1.289
 # Wolfi publishes only `latest`; the digest is the pin and Renovate moves it.
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43 AS tools
 
+# The release workflow passes the build day, so the package layers refresh
+# daily instead of staying cached until the base digest moves.
+ARG WOLFI_REFRESH
+
 # hadolint ignore=DL3018
 RUN apk add --no-cache bash coreutils curl gpg gpg-agent jq
 
@@ -100,6 +104,7 @@ ENTRYPOINT ["/tls-proxy"]
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43
 
 ARG CLAUDE_CODE_VERSION
+ARG WOLFI_REFRESH
 
 LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-mooring" \
       org.opencontainers.image.description="Claude Code as a long-running agent behind sshd and tmux" \

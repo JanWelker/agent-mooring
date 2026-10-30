@@ -113,6 +113,9 @@ jobs:
         with:
           cosign-release: ${{ env.COSIGN_VERSION }}
 
+      - id: day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
       # Pushed by digest only; the tag follows once the checks below pass.
       - name: Build and push the image
         id: build
@@ -121,7 +124,9 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          build-args: CLAUDE_CODE_VERSION=${{ env.VERSION }}
+          build-args: |
+            CLAUDE_CODE_VERSION=${{ env.VERSION }}
+            WOLFI_REFRESH=${{ steps.day.outputs.day }}
           labels: org.opencontainers.image.version=${{ env.TAG }}
           provenance: mode=max
           sbom: true
