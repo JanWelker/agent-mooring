@@ -4,14 +4,18 @@
 ARG CLAUDE_CODE_VERSION=2.1.289
 
 # Wolfi publishes only `latest`; the digest is the pin and Renovate moves it.
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43 AS tools
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:88a20e2d017bd20cdc0cb3910de603e7bea9512a6c351a8dd3c9df212ab03d73 AS tools
 
 # The release workflow passes the build day, so the package layers refresh
-# daily instead of staying cached until the base digest moves.
+# daily instead of staying cached until the base digest moves. wolfi-base pins
+# its own packages to exact versions in /etc/apk/world; without the pins the
+# upgrade takes the fixes released since the digest.
 ARG WOLFI_REFRESH
 
 # hadolint ignore=DL3018
-RUN apk add --no-cache bash coreutils curl gpg gpg-agent jq
+RUN sed -i 's/[=~<>].*//' /etc/apk/world \
+ && apk upgrade --no-cache \
+ && apk add --no-cache bash coreutils curl gpg gpg-agent jq
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -101,7 +105,7 @@ COPY --from=tls-proxy-build /out/tls-proxy /tls-proxy
 EXPOSE 2222
 ENTRYPOINT ["/tls-proxy"]
 
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:256c88bb066424045021090932d50be93c8e3f2ce3586707702a401b146f3e43
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:88a20e2d017bd20cdc0cb3910de603e7bea9512a6c351a8dd3c9df212ab03d73
 
 ARG CLAUDE_CODE_VERSION
 ARG WOLFI_REFRESH
@@ -114,7 +118,9 @@ LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-moorin
 # The package names carry the Node.js and Python majors; everything else
 # follows Wolfi at build time.
 # hadolint ignore=DL3018
-RUN apk add --no-cache \
+RUN sed -i 's/[=~<>].*//' /etc/apk/world \
+ && apk upgrade --no-cache \
+ && apk add --no-cache \
       bash ca-certificates-bundle curl gh git jq less nodejs-24 npm \
       openssh-client openssh-keygen openssh-server openssh-sftp-server procps \
       python-3.14 ripgrep rsync shadow tini tmux \
