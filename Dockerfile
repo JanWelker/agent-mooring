@@ -91,7 +91,7 @@ RUN CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" \
 
 # The chart's TLS sidecar, built with --target tls-proxy: one static binary,
 # no shell, so it carries none of the agent image's packages.
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3 AS tls-proxy
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:18f4cc26c9ffa7f20a359298be7deadac5c607c8e03a02b8119f1a5fc2f82c99 AS tls-proxy
 
 LABEL org.opencontainers.image.source="https://github.com/JanWelker/agent-mooring" \
       org.opencontainers.image.description="TLS sidecar of agent-mooring: terminates TLS and forwards to sshd" \
