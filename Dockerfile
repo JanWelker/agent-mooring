@@ -30,7 +30,7 @@ ARG HELM_VERSION=4.3.1
 # renovate: datasource=github-releases depName=argoproj/argo-cd extractVersion=^v(?<version>.*)$
 ARG ARGOCD_VERSION=3.5.6
 # renovate: datasource=github-releases depName=cilium/cilium-cli extractVersion=^v(?<version>.*)$
-ARG CILIUM_CLI_VERSION=0.20.1
+ARG CILIUM_CLI_VERSION=0.20.2
 # renovate: datasource=github-releases depName=openbao/openbao extractVersion=^v(?<version>.*)$
 ARG OPENBAO_VERSION=2.7.1
 # renovate: datasource=github-releases depName=archestra-ai/OpenAPPA extractVersion=^v(?<version>.*)$
