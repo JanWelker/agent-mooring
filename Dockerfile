@@ -26,7 +26,7 @@ ARG CLAUDE_CODE_KEY=31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
 # renovate: datasource=github-releases depName=kubernetes/kubernetes extractVersion=^v(?<version>.*)$
 ARG KUBECTL_VERSION=1.37.2
 # renovate: datasource=github-releases depName=helm/helm extractVersion=^v(?<version>.*)$
-ARG HELM_VERSION=4.3.1
+ARG HELM_VERSION=4.3.2
 # renovate: datasource=github-releases depName=argoproj/argo-cd extractVersion=^v(?<version>.*)$
 ARG ARGOCD_VERSION=3.6.1
 # renovate: datasource=github-releases depName=cilium/cilium-cli extractVersion=^v(?<version>.*)$
