@@ -156,7 +156,7 @@ value. Secrets come from the store, without the `kv/` prefix:
 | Secret | Key | When |
 | --- | --- | --- |
 | `claude-<session>-github` → `github-token` | `claude-<session>/github`, property `token`; one PAT for all repositories | `repos`, `repo` or `skills.repo` set |
-| `claude-<session>-argocd` → `argocd-token` | `claude-agents/argocd`, property `token` | `argocd.enabled` |
+| `claude-<session>-argocd` → `argocd-token` | `claude-<session>/argocd`, property `token` | `argocd.enabled` |
 
 The tokens are files under `/var/run/secrets/agent-mooring`, not environment
 variables. `gh`, git's credential helper and `argocd` are wrappers that read
