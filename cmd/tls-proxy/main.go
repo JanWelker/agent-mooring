@@ -2,7 +2,9 @@
 // session's certificate and forwards each connection to sshd on loopback. It
 // re-reads the certificate every TLS_RELOAD_INTERVAL, so a cert-manager
 // renewal reaches the next handshake without a restart; open connections keep
-// the certificate they started with.
+// the certificate they started with. At most TLS_MAX_CONNECTIONS connections
+// are served at once and the rest are closed on accept: the listener is public
+// and a handshake costs memory before anyone has authenticated.
 package main
 
 import (
@@ -33,6 +35,11 @@ func main() {
 		log.Fatalf("TLS_RELOAD_INTERVAL must be a positive number of seconds")
 	}
 
+	limit, err := strconv.Atoi(env("TLS_MAX_CONNECTIONS", "64"))
+	if err != nil || limit < 1 {
+		log.Fatalf("TLS_MAX_CONNECTIONS must be a positive number")
+	}
+
 	store, err := newCertStore(certFile, keyFile)
 	if err != nil {
 		log.Fatal(err)
@@ -54,7 +61,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	serve(ln, target)
+	serve(ln, target, limit)
 }
 
 func env(name, fallback string) string {
@@ -64,9 +71,11 @@ func env(name, fallback string) string {
 	return fallback
 }
 
-// serve accepts until the listener fails. Handshake errors are not logged:
-// every TCP probe is one.
-func serve(ln net.Listener, target string) {
+// serve accepts until the listener fails, and drops a connection arriving
+// while limit are in flight, handshakes included. Handshake errors are not
+// logged: every TCP probe is one.
+func serve(ln net.Listener, target string, limit int) {
+	slots := make(chan struct{}, limit)
 	for {
 		c, err := ln.Accept()
 		if err != nil {
@@ -77,7 +86,15 @@ func serve(ln net.Listener, target string) {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-		go forward(c, target)
+		select {
+		case slots <- struct{}{}:
+			go func() {
+				defer func() { <-slots }()
+				forward(c, target)
+			}()
+		default:
+			_ = c.Close()
+		}
 	}
 }
 
