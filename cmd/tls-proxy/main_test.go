@@ -92,7 +92,7 @@ func TestForwardAndReload(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	go serve(ln, backend.Addr().String())
+	go serve(ln, backend.Addr().String(), 8)
 
 	c, err := tls.Dial("tcp", ln.Addr().String(), &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
@@ -131,5 +131,85 @@ func TestForwardAndReload(t *testing.T) {
 	}
 	if cn := servedCN(t, ln.Addr().String()); cn != "two.test" {
 		t.Fatalf("served %s after renewal, want two.test", cn)
+	}
+}
+
+// With one slot taken by an idle connection, a second is closed at once and
+// the first still works; when the first ends, a new one is served again.
+func TestConnectionLimit(t *testing.T) {
+	dir := t.TempDir()
+	writePair(t, dir, "limit.test")
+
+	backend, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer backend.Close()
+	go func() {
+		for {
+			c, err := backend.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer c.Close()
+				_, _ = io.Copy(c, c)
+			}()
+		}
+	}()
+
+	store, err := newCertStore(filepath.Join(dir, "tls.crt"), filepath.Join(dir, "tls.key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{GetCertificate: store.get})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go serve(ln, backend.Addr().String(), 1)
+
+	cfg := &tls.Config{InsecureSkipVerify: true}
+	first, err := tls.Dial("tcp", ln.Addr().String(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	echo := func(c *tls.Conn) error {
+		if _, err := c.Write([]byte("x")); err != nil {
+			return err
+		}
+		_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_, err := io.ReadFull(c, make([]byte, 1))
+		return err
+	}
+	if err := echo(first); err != nil {
+		t.Fatalf("first connection: %v", err)
+	}
+
+	if second, err := tls.Dial("tcp", ln.Addr().String(), cfg); err == nil {
+		defer second.Close()
+		if err := echo(second); err == nil {
+			t.Fatal("a second connection was served past the limit")
+		}
+	}
+	if err := echo(first); err != nil {
+		t.Fatalf("first connection after a refused one: %v", err)
+	}
+
+	first.Close()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		c, err := tls.Dial("tcp", ln.Addr().String(), cfg)
+		if err == nil {
+			err = echo(c)
+			c.Close()
+		}
+		if err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no connection served after the slot was freed: %v", err)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }

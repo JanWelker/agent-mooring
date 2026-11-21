@@ -109,7 +109,9 @@ its own image, a static Go binary on distroless `static`, so the one container
 reachable from outside the pod carries no shell and no packages. It terminates
 TLS on :2222 with the session's certificate and forwards to sshd. It re-reads
 the certificate every minute, so a renewal reaches the next handshake; open
-connections keep running.
+connections keep running. It serves at most 64 connections at once and closes the rest on accept
+(`TLS_MAX_CONNECTIONS`), so a flood of handshakes on the public hostname
+cannot exhaust the sidecar's memory.
 
 ## Chart values
 
