@@ -75,6 +75,23 @@ spec:
     - toFQDNs:
         - matchName: {{ .Values.argocd.server }}
       {{- include "agent-mooring.https" . | nindent 6 }}
+    {{- if .Values.argocd.gateway }}
+    - toEntities:
+        - ingress
+      {{- include "agent-mooring.https" . | nindent 6 }}
+    {{- end }}
+    {{- if .Values.argocd.backend.namespace }}
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: {{ .Values.argocd.backend.namespace | quote }}
+            {{- range $k, $v := .Values.argocd.backend.labels }}
+            {{ printf "k8s:%s" $k | quote }}: {{ $v | quote }}
+            {{- end }}
+      toPorts:
+        - ports:
+            - port: {{ .Values.argocd.backend.port | toString | quote }}
+              protocol: TCP
+    {{- end }}
     {{- end }}
     {{- range .Values.extraEgressFQDNs }}
     - toFQDNs:

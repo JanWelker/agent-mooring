@@ -35,6 +35,19 @@ kubernetes:
 argocd:
   enabled: false
   server: argo-grpc.infra.k8s.wlkr.ch
+  # -- Egress to the `ingress` entity on 443. Needed when `server` is served
+  # by a Cilium Gateway in this cluster: its address is the `ingress` entity,
+  # which an FQDN rule never selects. Admits every hostname on the cluster's
+  # Gateways, not only `server`. Set false for a server outside the cluster.
+  gateway: true
+  # -- The Argo CD server pod behind that Gateway. Cilium also checks the
+  # caller's egress against the backend, so the pod needs a rule naming it.
+  # Empty `namespace` omits the rule.
+  backend:
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: argocd-server
+    port: 8080
 
 ssh:
   # -- Public key lines for ~/.ssh/authorized_keys.

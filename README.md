@@ -129,6 +129,8 @@ cannot exhaust the sidecar's memory.
 | `kubernetes.access` | `none` | `none`: own ServiceAccount, no token. `read`/`write`: `claude-reader`/`claude-writer` with a token |
 | `argocd.enabled` | `false` | Mounts the Argo CD token and sets `ARGOCD_SERVER`, `ARGOCD_OPTS=--grpc-web` |
 | `argocd.server` | `argo-grpc.infra.k8s.wlkr.ch` | |
+| `argocd.gateway` | `true` | Egress to the `ingress` entity on 443, for a server behind a Cilium Gateway in this cluster. Set `false` for one outside it |
+| `argocd.backend` | `{namespace: argocd, labels: {app.kubernetes.io/name: argocd-server}, port: 8080}` | The Argo CD server pod behind that Gateway; empty `namespace` omits the rule |
 | `ssh.authorizedKeys` | `[]` | Public key lines |
 | `ssh.gateway` | `apps-gateway`/`kube-system`/`ssh` | `TLSRoute` parent: name, namespace, sectionName |
 | `ssh.domain` | `ssh.wlkr.ch` | |
@@ -189,7 +191,9 @@ and lets out:
 | `github.com`, `api.github.com`, `*.githubusercontent.com`, `ghcr.io` | `repos`, `repo` or `skills.repo` set, or `appa.enabled` |
 | `registry.npmjs.org` | `acp.enabled` or `mcpServers` set |
 | `kube-apiserver` entity | `kubernetes.access` not `none` |
-| `argocd.server` | `argocd.enabled` |
+| `argocd.server` (FQDN, for a server outside the cluster) | `argocd.enabled` |
+| `ingress` entity, 443: every hostname on the cluster's Gateways, not only `argocd.server`, because Cilium classifies a Gateway address as `ingress` and an FQDN rule never selects it | `argocd.enabled` and `argocd.gateway` |
+| `argocd.backend` pod, TCP `port`: Cilium checks the caller's egress against the Gateway's backend too | `argocd.enabled` and `argocd.backend.namespace` set |
 | `extraEgressFQDNs` | listed |
 
 ## SSH
