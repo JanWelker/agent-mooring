@@ -63,6 +63,28 @@ claude-writer
 
 {{/* The chart's managed settings, with .Values.settings merged over them. */}}
 {{- define "agent-mooring.managedSettings" -}}
+{{- /*
+  Deny rules are best-effort text patterns on the command Claude writes (a *
+  matches any text, and `git * push` needs a word between git and push, so each
+  git rule comes as `git push` and `git * push`). They do not catch a path
+  invocation, `sh -c`, an alias or a variable. Branch protection is the gate.
+*/ -}}
+{{- $deny := list
+  "Bash(gh pr merge --admin *)" "Bash(gh pr merge * --admin *)" "Bash(gh pr merge * --admin)"
+  "Bash(git push * main)" "Bash(git push * HEAD:main)" "Bash(git push * main:main)"
+  "Bash(git push --force *)" "Bash(git push -f *)"
+  "Bash(kubectl delete namespace *)" "Bash(kubectl delete ns *)"
+  "Bash(gh pr merge *)" "Bash(gh * pr merge *)"
+  "Bash(gh api *PUT*merge*)" "Bash(gh api *merge*PUT*)"
+  "Bash(gh api *put*merge*)" "Bash(gh api *merge*put*)"
+  "Bash(gh api *mergePullRequest*)" "Bash(gh api *git/refs/heads/main*)" -}}
+{{- range $push := list "git push" "git * push" -}}
+{{- range $tail := list
+  "* main" "* main *" "*:main" "*:main *" "*refs/heads/main*"
+  "--force*" "* --force*" "-f*" "* -f*" "* +*" -}}
+{{- $deny = append $deny (printf "Bash(%s %s)" $push $tail) -}}
+{{- end -}}
+{{- end -}}
 {{- $defaults := dict
   "env" (dict "DISABLE_AUTOUPDATER" "1")
   "remoteControlAtStartup" true
@@ -75,11 +97,7 @@ claude-writer
       "Bash(gh pr checks *)" "Bash(gh pr view *)" "Bash(gh pr list *)"
       "Bash(gh run view *)" "Bash(gh run list *)" "Bash(gh run watch *)"
       "Bash(argocd app get *)" "Bash(argocd app list *)" "Bash(argocd app diff *)")
-    "deny" (list
-      "Bash(gh pr merge --admin *)" "Bash(gh pr merge * --admin *)" "Bash(gh pr merge * --admin)"
-      "Bash(git push * main)" "Bash(git push * HEAD:main)" "Bash(git push * main:main)"
-      "Bash(git push --force *)" "Bash(git push -f *)"
-      "Bash(kubectl delete namespace *)" "Bash(kubectl delete ns *)"))
+    "deny" $deny)
   "hooks" (dict
     "SessionStart" (list (dict "hooks" (list (dict "type" "command" "command" "/usr/local/bin/agent-session-start" "timeout" 30)))))
 -}}

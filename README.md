@@ -172,11 +172,26 @@ exports `GH_TOKEN` and `ARGOCD_AUTH_TOKEN` as of its start, for other tools.
 
 The chart's [defaults](chart/agent-mooring/templates/_helpers.tpl) turn on
 Remote Control for every session, drop commit and PR attribution, allow
-read-only `kubectl`, `gh pr checks` and `argocd app get`, deny
-`gh pr merge --admin`, pushes to `main` and force pushes, and run a
+read-only `kubectl`, `gh pr checks` and `argocd app get`, and run a
 SessionStart hook that tells Claude which GitHub user, cloned repositories, Kubernetes access and
 Argo CD server it has. `settings` merges over them; a list replaces the
 default list.
+
+The default `deny` list is a best-effort guard inside the agent, not a
+boundary. Claude Code matches each rule against the command text Claude
+writes ([Bash rule limits](https://code.claude.com/docs/en/permissions#what-a-bash-rule-doesnt-match)),
+so it stops the usual spellings and nothing else. It denies:
+
+- `gh pr merge` in any form, `gh api` calls that PUT to a `merge` path, the `mergePullRequest` GraphQL mutation and writes to `git/refs/heads/main`;
+- `git push` (also `git -C <dir> push` and `git -c <k=v> push`) that names `main`, including `HEAD:main`, `:refs/heads/main` and `main --flag`, that forces (`--force`, `--force-with-lease`, `-f`, `-fu`) or that uses a `+` refspec;
+- `kubectl delete namespace` and `kubectl delete ns`.
+
+It cannot catch a git or gh invoked by path or through `sh -c`, an alias, a
+shell variable or a script that pushes, a push to a branch that is not
+literally `main` (`master`, a renamed default branch), or a push refspec built
+from variables. The control that holds is branch protection (a ruleset that
+requires a pull request and the status checks, and forbids force pushes) on
+every repository the session's token can write to.
 
 ### Network policy
 
