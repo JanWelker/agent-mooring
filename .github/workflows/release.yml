@@ -44,7 +44,7 @@ env:
   # renovate: datasource=github-releases depName=helm/helm
   HELM_VERSION: v4.3.2
   # renovate: datasource=github-releases depName=sigstore/cosign
-  COSIGN_VERSION: v3.1.4
+  COSIGN_VERSION: v3.1.5
 
 jobs:
   check:
